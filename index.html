@@ -3,506 +3,764 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Goal Tracker</title>
+    <title>Zenith</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load React and Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        /* Custom styles for mobile-friendly goal tile visibility */
-        .goal-tile:hover .delete-btn {
-            opacity: 1;
+        /* Custom styles for the app */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
         }
-        .delete-btn {
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-        /* Override for mobile/small screens to always show options button */
-        @media (max-width: 640px) {
-            .delete-btn {
-                opacity: 1; /* Always show options icon on mobile */
-            }
+        /* Ensure the textarea handles wrapping correctly */
+        .whitespace-pre-wrap {
+            white-space: pre-wrap;
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen p-4 sm:p-8">
+<body>
 
-    <div id="app" class="max-w-4xl mx-auto">
-        <header class="text-center mb-10">
-            <h1 class="text-4xl font-extrabold text-blue-700">Timeline Goal Tracker</h1>
-            <p class="text-gray-500 mt-2">Set deadlines, add tags, and visualize your progress by time periods.</p>
-            <div id="auth-status" class="text-sm text-gray-400 mt-2">Loading authentication...</div>
-        </header>
-
-        <div class="bg-white p-6 rounded-xl shadow-lg mb-8 border border-gray-100">
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Set a New Goal</h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input id="new-goal-text" type="text" placeholder="Goal Description (e.g., Finish Q4 report)"
-                        class="col-span-3 md:col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                
-                <input id="new-goal-due-date" type="date" title="Due Date"
-                        class="col-span-3 md:col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-
-                <input id="new-goal-tags" type="text" placeholder="Tags (comma-separated: work, health)"
-                        class="col-span-3 md:col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                <input id="new-goal-step-text" type="text" placeholder="Goal Steps/Visualization Keyword"
-                        class="col-span-3 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-            </div>
-            <button onclick="addGoal()"
-                    class="mt-4 w-full md:w-auto px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition duration-150 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                Add Goal
-            </button>
-        </div>
-
-        <div class="bg-white p-6 rounded-xl shadow-lg mb-8 border border-gray-100">
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Visualize Goals</h2>
-            
-            <div class="flex flex-wrap gap-2 mb-4" id="filter-container">
-                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-medium transition duration-150" onclick="setFilter('All')">All Goals</button>
-                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-medium transition duration-150" onclick="setFilter('Daily')">Daily</button>
-                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-medium transition duration-150" onclick="setFilter('Weekly')">Weekly</button>
-                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-medium transition duration-150" onclick="setFilter('Monthly')">Monthly</button>
-                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-medium transition duration-150" onclick="setFilter('Yearly')">Yearly</button>
-            </div>
-
-            <div class="flex space-x-2">
-                <input id="tag-search-input" type="text" placeholder="Search by Tag (e.g., 'work')"
-                        class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                <button onclick="searchByTag()"
-                        class="px-4 py-3 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition duration-150 shadow-md">
-                    Search
-                </button>
-            </div>
-        </div>
-
-        <div id="goals-list" class="space-y-4">
-            <div class="text-center p-8 text-gray-400" id="loading-indicator">
-                <svg class="animate-spin h-5 w-5 text-gray-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Loading goals...
-            </div>
-        </div>
-        
-        <div class="mt-8 pt-4 border-t border-gray-200 text-center">
-            <p class="text-xs text-gray-400">Your collaborative ID (share to sync goals):</p>
-            <code id="user-id-display" class="text-sm font-mono bg-gray-100 p-1 rounded text-gray-600">ID Loading...</code>
-        </div>
-    </div>
+    <div id="root"></div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        // Import Firebase modules using CDN
+        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, serverTimestamp, orderBy, where, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global variables provided by the environment
+        // Global variables provided by the Canvas environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        let firebaseConfig = null;
-        try {
-            firebaseConfig = typeof __firebase_config !== 'undefined' && __firebase_config ? JSON.parse(__firebase_config) : null;
-        } catch (e) {
-            console.error("Failed to parse __firebase_config. It might contain invalid JSON.", e);
-            firebaseConfig = null; 
-        }
+        // Ensure Firebase log level is set low to avoid excessive console output
+        setLogLevel('error');
 
-        let app, db, auth, userId = null;
-        let allGoals = [];
-        let currentFilter = 'All'; // Can be 'All', 'Daily', 'Weekly', 'Monthly', 'Yearly', or a tag string
+        // The collection path structure: /artifacts/{appId}/users/{userId}/{collectionName}
+        const getCollectionPath = (userId) => `/artifacts/${appId}/users/${userId}/goals`;
 
-        // --- 1. FIREBASE INITIALIZATION AND AUTHENTICATION ---
+        // Attach all necessary Firebase imports and constants to the window for the Babel script to use
+        window.firebaseConfig = firebaseConfig;
+        window.initialAuthToken = initialAuthToken;
+        window.firebaseImports = {
+            initializeApp, getApps, getApp, 
+            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+            getFirestore, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc,
+            getCollectionPath
+        };
 
-        if (firebaseConfig) {
-            setLogLevel('Debug');
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-            
-            // Function to handle sign-in
-            async function initializeAuth() {
-                if (!auth) return;
-                try {
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(auth, initialAuthToken);
-                        console.log("Signed in with custom token.");
-                    } else {
-                        await signInAnonymously(auth);
-                        console.log("Signed in anonymously.");
+    </script>
+
+    <script type="text/babel">
+        // Destructure imports from the globally available firebaseImports
+        const {
+            initializeApp, getApps, getApp, 
+            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+            getFirestore, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc,
+            getCollectionPath
+        } = window.firebaseImports;
+
+        const firebaseConfig = window.firebaseConfig;
+        const initialAuthToken = window.initialAuthToken;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+
+        const { useState, useEffect, useCallback } = React;
+
+        // --- Firebase Initialization and Auth Hook ---
+
+        function useFirebaseSetup() {
+            const [db, setDb] = useState(null);
+            const [auth, setAuth] = useState(null);
+            const [userId, setUserId] = useState(null);
+            const [isAuthReady, setIsAuthReady] = useState(false);
+
+            useEffect(() => {
+                const setup = async () => {
+                    try {
+                        // 1. Initialize Firebase
+                        if (!getApps().length) {
+                            initializeApp(firebaseConfig);
+                        }
+                        const app = getApp();
+                        const firestore = getFirestore(app);
+                        const authentication = getAuth(app);
+
+                        setDb(firestore);
+                        setAuth(authentication);
+
+                        // 2. Handle Authentication
+                        const unsubscribe = onAuthStateChanged(authentication, async (user) => {
+                            if (!user) {
+                                if (initialAuthToken) {
+                                    await signInWithCustomToken(authentication, initialAuthToken);
+                                } else {
+                                    await signInAnonymously(authentication);
+                                }
+                            }
+
+                            const currentUser = authentication.currentUser;
+                            const currentUserId = currentUser?.uid || crypto.randomUUID();
+                            setUserId(currentUserId);
+                            setIsAuthReady(true);
+                        });
+
+                        return () => unsubscribe();
+
+                    } catch (error) {
+                        console.error("Firebase Setup Error:", error);
+                        setUserId(crypto.randomUUID());
+                        setIsAuthReady(true);
                     }
-                } catch (error) {
-                    console.error("Authentication error:", error);
-                    document.getElementById('auth-status').textContent = 'Auth Error. Check console.';
-                }
-            }
+                };
+                setup();
+            }, []);
 
-            // Listen for auth state changes and start Firestore listener
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    userId = user.uid;
-                    document.getElementById('auth-status').textContent = `Authenticated User ID: ${userId}`;
-                    document.getElementById('user-id-display').textContent = userId;
-                    startGoalListener(); // Start listening for data once authenticated
-                } else {
-                    document.getElementById('auth-status').textContent = 'Awaiting Sign-in...';
-                    initializeAuth(); // Attempt sign-in if not signed in
-                }
-            });
-        } else {
-            document.getElementById('auth-status').textContent = 'Firebase Config Missing. Running in read-only mode.';
+            return { db, userId, isAuthReady };
         }
 
-        // --- 2. FIRESTORE DATA FUNCTIONS ---
+        // --- Data Fetching Hook ---
 
-        function getGoalsCollectionRef() {
-            if (!userId || !db) {
-                console.error("Cannot get collection ref: Database not initialized or User ID not set.");
-                return null;
-            }
-            return collection(db, `artifacts/${appId}/public/data/goals`);
-        }
-        
-        /**
-         * Converts comma-separated tag string to an array of trimmed, lowercase strings.
-         */
-        function parseTags(tagsString) {
-            if (!tagsString || typeof tagsString !== 'string') return [];
-            return tagsString.split(',')
-                .map(tag => tag.trim().toLowerCase())
-                .filter(tag => tag.length > 0);
-        }
+        function useGoalData(db, userId, isAuthReady) {
+            const [goals, setGoals] = useState([]);
+            const [isLoading, setIsLoading] = useState(true);
 
-        /**
-         * Adds a new goal document to Firestore.
-         */
-        window.addGoal = async function() {
-            if (!db) return console.error("Cannot add goal: Database not initialized.");
-            
-            const textInput = document.getElementById('new-goal-text');
-            const dateInput = document.getElementById('new-goal-due-date');
-            const tagsInput = document.getElementById('new-goal-tags');
-            // NEW: Get the steps/image keyword input
-            const stepInput = document.getElementById('new-goal-step-text');
+            useEffect(() => {
+                if (!isAuthReady || !db || !userId) return;
 
-            const text = textInput.value.trim();
-            const dueDate = dateInput.value; // YYYY-MM-DD string
-            const tags = parseTags(tagsInput.value);
-            const stepText = stepInput.value.trim(); // NEW: Steps/Keyword
-            
-            if (!userId || !text) {
-                console.warn("Goal text or User ID missing.");
-                return;
-            }
+                const goalsCollectionRef = collection(db, getCollectionPath(userId));
+                const goalsQuery = query(goalsCollectionRef);
 
-            const goalsRef = getGoalsCollectionRef();
-            if (!goalsRef) return;
+                const unsubscribe = onSnapshot(goalsQuery, (snapshot) => {
+                    const fetchedGoals = snapshot.docs.map(doc => {
+                        const data = doc.data();
+                        
+                        // Ensure steps exist and are parsed correctly
+                        const steps = data.steps ? (data.steps.map((step, index) => ({
+                            ...step,
+                            id: step.id || `${doc.id}-${index}`,
+                        }))) : [];
 
-            try {
-                await addDoc(goalsRef, {
-                    text: text,
-                    completed: false,
-                    createdAt: serverTimestamp(),
-                    userId: userId,
-                    dueDate: dueDate || null, 
-                    tags: tags,
-                    // NEW: Store step/image keyword
-                    stepKeyword: stepText || 'goal tracking'
-                });
-                textInput.value = '';
-                dateInput.value = '';
-                tagsInput.value = '';
-                stepInput.value = ''; // Clear new input
-                console.log("Goal added successfully.");
-            } catch (e) {
-                console.error("Error adding document: ", e);
-            }
-        }
-
-        /**
-         * Toggles the completion status of a goal.
-         */
-        window.toggleComplete = async function(goalId, currentStatus) {
-            if (!db) return console.error("Cannot toggle goal: Database not initialized.");
-            
-            const goalsRef = getGoalsCollectionRef();
-            if (!goalsRef) return;
-
-            try {
-                const goalDocRef = doc(goalsRef, goalId);
-
-                await runTransaction(db, async (transaction) => {
-                    transaction.update(goalDocRef, {
-                        completed: !currentStatus
+                        return {
+                            id: doc.id,
+                            name: data.name,
+                            startDate: data.startDate || '',
+                            endDate: data.endDate || '',
+                            notes: data.notes || '',
+                            steps: steps,
+                        };
                     });
+                    setGoals(fetchedGoals);
+                    setIsLoading(false);
+                }, (error) => {
+                    console.error("Error listening to goals:", error);
+                    setIsLoading(false);
                 });
 
-                console.log(`Goal ${goalId} completion toggled.`);
-            } catch (e) {
-                console.error("Error updating document: ", e);
+                return () => unsubscribe();
+            }, [db, userId, isAuthReady]);
+
+            return { goals, isLoading };
+        }
+
+        // --- Utility Functions ---
+
+        const formatDate = (dateString) => {
+            if (!dateString) return 'N/A';
+            const [year, month, day] = dateString.split('-');
+            if (year && month && day) {
+                return `${day}/${month}/${year}`;
             }
-        }
-        
-        /**
-         * Toggles visibility of goal steps.
-         */
-        window.toggleSteps = function(goalId) {
-            const stepsElement = document.getElementById(`steps-${goalId}`);
-            const chevronIcon = document.getElementById(`chevron-${goalId}`);
+            return dateString;
+        };
 
-            if (!stepsElement || !chevronIcon) return;
-
-            if (stepsElement.classList.contains('hidden')) {
-                stepsElement.classList.remove('hidden');
-                stepsElement.classList.add('animate-in', 'fade-in', 'slide-in-from-top-1');
-                chevronIcon.classList.remove('rotate-0');
-                chevronIcon.classList.add('rotate-180');
-            } else {
-                stepsElement.classList.add('hidden');
-                chevronIcon.classList.remove('rotate-180');
-                chevronIcon.classList.add('rotate-0');
-            }
+        const getCurrentDateString = () => {
+            return new Date().toISOString().slice(0, 10);
         }
 
-        /**
-         * Deletes a goal document from Firestore.
-         */
-        window.deleteGoal = async function(goalId) {
-            if (!db) return console.error("Cannot delete goal: Database not initialized.");
+        // --- Goal Management Components ---
 
-            const goalsRef = getGoalsCollectionRef();
-            if (!goalsRef) return;
+        const AddStepForm = ({ db, userId, goalId, currentSteps }) => {
+            const [description, setDescription] = useState('');
+            const [startDate, setStartDate] = useState('');
+            const [endDate, setEndDate] = useState('');
 
-            try {
-                const goalDocRef = doc(goalsRef, goalId);
-                await deleteDoc(goalDocRef);
-                console.log(`Goal ${goalId} deleted.`);
-            } catch (e) {
-                console.error("Error deleting document: ", e);
-            }
-        }
+            const handleAddStep = async (e) => {
+                e.preventDefault();
+                if (!description.trim() || !db || !userId) return;
 
-        /**
-         * Sets up the real-time listener for the goals collection.
-         */
-        function startGoalListener() {
-            if (!db) return console.error("Cannot start listener: Database not initialized.");
+                const newStep = {
+                    id: `${goalId}-${Date.now()}`, 
+                    description: description.trim(),
+                    isCompleted: false,
+                    startDate: startDate,
+                    endDate: endDate,
+                };
 
-            const goalsRef = getGoalsCollectionRef();
-            if (!goalsRef) return;
-
-            const q = query(goalsRef, orderBy('createdAt', 'desc'));
-
-            onSnapshot(q, (snapshot) => {
-                allGoals = [];
-                snapshot.forEach((doc) => {
-                    allGoals.push({ id: doc.id, ...doc.data() });
-                });
-                console.log("Goals updated. Total:", allGoals.length);
-                renderGoals(); // Re-render every time data changes
-                const indicator = document.getElementById('loading-indicator');
-                if (indicator) indicator.classList.add('hidden');
-            }, (error) => {
-                console.error("Firestore snapshot error: ", error);
-            });
-        }
-        
-        // --- 3. FILTERING LOGIC ---
-        // (Unchanged from previous fix, ensuring date consistency)
-
-        window.setFilter = function(filterType) {
-            currentFilter = filterType;
-            const tagInput = document.getElementById('tag-search-input');
-            if (tagInput) tagInput.value = ''; // Clear tag search
-            updateFilterButtons(filterType);
-            renderGoals();
-        }
-
-        window.searchByTag = function() {
-            const tagInput = document.getElementById('tag-search-input');
-            const tag = tagInput ? tagInput.value.trim().toLowerCase() : '';
-            
-            if (tag) {
-                currentFilter = tag;
-                updateFilterButtons(tag);
-            } else {
-                setFilter('All');
-            }
-            renderGoals();
-        }
-
-        function updateFilterButtons(activeFilter) {
-            const container = document.getElementById('filter-container');
-            if (!container) return; 
-
-            const filterButtons = Array.from(container.querySelectorAll('.filter-btn'));
-
-            filterButtons.forEach(btn => {
-                if (!btn) return; 
-
-                btn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
-                btn.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-blue-100');
-                
-                if (btn.textContent.trim().toLowerCase() === activeFilter.toLowerCase() + ' goals' || 
-                    btn.textContent.trim().toLowerCase() === activeFilter.toLowerCase()) {
-                    btn.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-blue-100');
-                    btn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                try {
+                    const goalRef = doc(db, getCollectionPath(userId), goalId);
+                    await updateDoc(goalRef, {
+                        steps: [...currentSteps, newStep]
+                    });
+                    setDescription('');
+                    setStartDate('');
+                    setEndDate('');
+                } catch (e) {
+                    console.error("Error adding step: ", e);
                 }
-            });
+            };
 
-            const searchBtn = document.querySelector('button[onclick="searchByTag()"]');
+            return (
+                <form onSubmit={handleAddStep} className="p-3 bg-white rounded-xl space-y-3 shadow-sm border border-gray-200">
+                    <h4 className="text-lg font-semibold text-gray-700">Add Task</h4>
+                    <input
+                        type="text"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="e.g., Complete 10 exercises"
+                        className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-green-500 focus:border-green-500 transition duration-150"
+                        required
+                    />
+                    <div className="flex space-x-2">
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="w-1/2 p-2 border border-gray-300 rounded-lg text-sm"
+                            title="Start Date"
+                        />
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="w-1/2 p-2 border border-gray-300 rounded-lg text-sm"
+                            title="Due Date"
+                        />
+                    </div>
+                    <button
+                        type="submit"
+                        className="w-full bg-green-600 hover:bg-green-700 text-white font-medium text-sm py-2 rounded-lg transition duration-200 shadow-md"
+                    >
+                        Add Task
+                    </button>
+                </form>
+            );
+        };
+
+        const GoalItem = ({ goal, db, userId }) => {
+            const [isExpanded, setIsExpanded] = useState(false);
+            const [isModalOpen, setIsModalOpen] = useState(false);
             
-            if (searchBtn) { 
-                if (currentFilter !== 'All' && !['Daily', 'Weekly', 'Monthly', 'Yearly'].includes(currentFilter)) {
-                    searchBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
-                    searchBtn.classList.add('bg-blue-600', 'hover:hover:bg-blue-700');
-                } else {
-                    searchBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-                    searchBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+            const [editNotes, setEditNotes] = useState(goal.notes); 
+            const [isEditingNotes, setIsEditingNotes] = useState(false);
+
+            useEffect(() => {
+                if (!isEditingNotes) {
+                    setEditNotes(goal.notes);
                 }
-            }
-        }
+            }, [goal.notes, isEditingNotes]);
 
-        function filterGoals(goals, filter) {
-            const now = new Date();
-            now.setHours(0, 0, 0, 0); 
+            const totalSteps = goal.steps.length;
+            const completedSteps = goal.steps.filter(s => s.isCompleted).length;
+            const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+            const isGoalCompleted = totalSteps > 0 && completedSteps === totalSteps;
 
-            if (filter === 'All') {
-                return goals;
-            }
+            const handleDeleteGoal = async () => {
+                setIsModalOpen(false); 
+                if (!db || !userId) return;
 
-            if (['Daily', 'Weekly', 'Monthly', 'Yearly'].includes(filter)) {
-                return goals.filter(goal => {
-                    if (!goal.dueDate) return false;
-
-                    const goalDate = new Date(goal.dueDate + 'T00:00:00'); 
-                    
-                    if (isNaN(goalDate)) return false;
-
-                    if (filter === 'Daily') {
-                        return goalDate.getTime() === now.getTime();
-                    } else if (filter === 'Weekly') {
-                        const oneWeek = 7 * 24 * 60 * 60 * 1000;
-                        const nextWeek = now.getTime() + oneWeek;
-                        return goalDate.getTime() >= now.getTime() && goalDate.getTime() < nextWeek;
-                    } else if (filter === 'Monthly') {
-                        return goalDate.getFullYear() === now.getFullYear() && goalDate.getMonth() === now.getMonth();
-                    } else if (filter === 'Yearly') {
-                        return goalDate.getFullYear() === now.getFullYear();
-                    }
-                    return false;
-                });
-            }
-
-            if (filter) {
-                const targetTag = filter.toLowerCase();
-                return goals.filter(goal => 
-                    Array.isArray(goal.tags) && goal.tags.includes(targetTag)
-                );
-            }
-
-            return goals;
-        }
-
-        // --- 4. UI RENDERING (MOBILE-FRIENDLY TILE IMPLEMENTATION) ---
-
-        function renderGoals() {
-            const listElement = document.getElementById('goals-list');
-            const filteredGoals = filterGoals(allGoals, currentFilter);
+                try {
+                    await deleteDoc(doc(db, getCollectionPath(userId), goal.id));
+                } catch (e) {
+                    console.error("Error deleting goal: ", e);
+                }
+            };
             
-            if (!listElement) return;
+            const handleSaveNotes = async () => {
+                if (!db || !userId) return;
+                try {
+                    const goalRef = doc(db, getCollectionPath(userId), goal.id);
+                    await updateDoc(goalRef, { notes: editNotes.trim() });
+                    setIsEditingNotes(false);
+                } catch (e) {
+                    console.error("Error saving notes:", e);
+                }
+            };
 
-            if (filteredGoals.length === 0) {
-                listElement.innerHTML = `<div class="p-8 text-center bg-white rounded-xl shadow-md text-gray-500">
-                    No goals found for the current view (**${currentFilter}**).
-                </div>`;
-                return;
-            }
 
-            listElement.innerHTML = filteredGoals.map(goal => {
-                const isCompleted = goal.completed;
-                const statusClass = isCompleted ? 'bg-green-50 border-green-200' : 'bg-white border-blue-200';
-                const textClass = isCompleted ? 'line-through text-gray-400' : 'text-gray-800';
-                
-                const displayDate = goal.dueDate ? new Date(goal.dueDate + 'T00:00:00') : null;
-                const dueText = displayDate ? `Due: ${displayDate.toLocaleDateString()}` : 'No Deadline';
-                
-                const tagBadges = (goal.tags || []).map(tag => 
-                    `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">#${tag}</span>`
-                ).join('');
+            const toggleStepCompletion = useCallback(async (stepId, isCompleted) => {
+                if (!db || !userId) return;
 
-                // NEW: Goal Steps/Image content (Simulated steps)
-                const goalStepsContent = `
-                    <div class="space-y-2 pt-3">
-                        <h4 class="font-semibold text-gray-600 border-b pb-1">Actionable Steps</h4>
-                        <div class="flex items-start space-x-2 text-sm text-gray-700">
-                            <input type="checkbox" checked class="mt-1 h-4 w-4 text-blue-600 rounded">
-                            <span>Step 1: Define specific metrics for success.</span>
+                try {
+                    const goalRef = doc(db, getCollectionPath(userId), goal.id);
+                    const updatedSteps = goal.steps.map(step =>
+                        step.id === stepId ? { ...step, isCompleted: isCompleted } : step
+                    );
+
+                    await updateDoc(goalRef, { steps: updatedSteps });
+                } catch (e) {
+                    console.error("Error toggling step completion: ", e);
+                }
+            }, [db, userId, goal.id, goal.steps]);
+
+            return (
+                <div className={`bg-white shadow-xl rounded-2xl p-6 mb-6 border-t-4 ${isGoalCompleted ? 'border-purple-500' : 'border-blue-500'}`}>
+                    <ConfirmationModal
+                        isOpen={isModalOpen}
+                        title="Delete Goal"
+                        message={`Are you sure you want to delete "${goal.name}"?`}
+                        onConfirm={handleDeleteGoal}
+                        onCancel={() => setIsModalOpen(false)}
+                    />
+
+                    {/* Goal Header */}
+                    <div className="flex flex-col mb-4">
+                        <div className="flex justify-between items-start">
+                            <h3 className={`text-2xl font-bold text-gray-800 ${isGoalCompleted ? 'line-through text-gray-500' : ''}`}>
+                                {goal.name}
+                            </h3>
+                             {/* Completion Badge */}
+                             <span className={`text-sm font-semibold px-3 py-1 rounded-full whitespace-nowrap ${isGoalCompleted ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {progressPercent}% Done
+                            </span>
                         </div>
-                        <div class="flex items-start space-x-2 text-sm text-gray-700">
-                            <input type="checkbox" class="mt-1 h-4 w-4 text-blue-600 rounded">
-                            <span>Step 2: Allocate 2 hours daily to this task.</span>
-                        </div>
-                        <div class="flex items-start space-x-2 text-sm text-gray-700">
-                            <input type="checkbox" class="mt-1 h-4 w-4 text-blue-600 rounded">
-                            <span>Step 3: Review progress on Friday.</span>
+                       
+                        {/* Dates and Progress Bar */}
+                        <p className="text-sm text-gray-500 mt-1 mb-3">
+                            Start: {formatDate(goal.startDate)} | Target: {formatDate(goal.endDate)}
+                        </p>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                                className={`h-2 rounded-full transition-all duration-500 ${isGoalCompleted ? 'bg-purple-500' : 'bg-blue-500'}`}
+                                style={{ width: `${progressPercent}%` }}
+                                title={`${completedSteps} of ${totalSteps} steps completed`}
+                            ></div>
                         </div>
                     </div>
-                `;
 
-                return `
-                    <div class="goal-tile rounded-xl shadow-lg border ${statusClass} overflow-hidden">
+                    <hr className="my-3 border-gray-100" />
+                    
+                    {/* Steps List */}
+                    <h4 className="text-lg font-bold text-gray-700 mb-3">Tasks ({completedSteps}/{totalSteps})</h4>
+                    <ul className="space-y-2 mb-4 max-h-60 overflow-y-auto pr-1">
+                        {goal.steps.length > 0 ? (
+                            goal.steps.map(step => (
+                                <li key={step.id} className="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 transition duration-100 hover:bg-gray-100">
+                                    <input
+                                        type="checkbox"
+                                        checked={step.isCompleted}
+                                        onChange={(e) => toggleStepCompletion(step.id, e.target.checked)}
+                                        className="h-5 w-5 text-green-600 rounded focus:ring-green-500 flex-shrink-0 cursor-pointer mr-3"
+                                        title="Mark as complete"
+                                    />
+                                    <div className={`text-sm flex-grow min-w-0 truncate ${step.isCompleted ? 'line-through text-gray-500' : 'text-gray-700'}`}>
+                                        <span className='block'>{step.description}</span>
+                                        {step.endDate && <span className='text-xs text-gray-400'>Target: {formatDate(step.endDate)}</span>}
+                                    </div>
+                                </li>
+                            ))
+                        ) : (
+                            <p className="text-center text-gray-500 italic p-2">No tasks yet. Add some below!</p>
+                        )}
+                    </ul>
+
+                    {/* Expansion Toggle Button */}
+                    <button
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="w-full text-sm font-semibold py-2 px-4 rounded-xl transition duration-150 border bg-gray-100 hover:bg-gray-200 text-gray-700 flex justify-center items-center space-x-2"
+                    >
+                        <span>{isExpanded ? 'Hide Details' : 'Details & Management'}</span>
+                        <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : 'rotate-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+
+                    {/* Expanded Content (Add Step, Notes, Delete) */}
+                    <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-screen pt-4' : 'max-h-0'}`}>
                         
-                        <div class="flex items-center p-4">
-                            
-                            <input type="checkbox" ${isCompleted ? 'checked' : ''} 
-                                   onclick="toggleComplete('${goal.id}', ${isCompleted})"
-                                   class="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 mr-4 flex-shrink-0">
-                            
-                            <div class="hidden sm:block mr-4 flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
-                                
+                        {/* 1. Add Step Form */}
+                        <div className="mb-4">
+                            <AddStepForm db={db} userId={userId} goalId={goal.id} currentSteps={goal.steps} />
+                        </div>
+                        
+                        <hr className="my-4 border-gray-200" />
 
-[Image of ${goal.stepKeyword || 'goal tracking'}]
+                        {/* 2. Notes Section */}
+                        <div className="bg-blue-50 p-4 rounded-xl mb-4 shadow-inner border border-blue-200">
+                            <h4 className="text-lg font-bold text-blue-800 mb-2 flex justify-between items-center">
+                                Notes
+                                {!isEditingNotes && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setIsEditingNotes(true); }}
+                                        className="text-sm text-blue-600 hover:text-blue-800 transition font-medium"
+                                        title="Edit Notes"
+                                    >
+                                        Edit
+                                    </button>
+                                )}
+                            </h4>
+                            {isEditingNotes ? (
+                                <div>
+                                    <textarea
+                                        value={editNotes}
+                                        onChange={(e) => setEditNotes(e.target.value)}
+                                        rows="4"
+                                        className="w-full p-2 border border-blue-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                                    />
+                                    <div className="flex justify-end space-x-2 mt-2">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditNotes(goal.notes); // Revert changes
+                                                setIsEditingNotes(false);
+                                            }}
+                                            className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleSaveNotes(); }}
+                                            className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+                                        >
+                                            Save
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-gray-700 text-sm whitespace-pre-wrap">
+                                    {goal.notes || 'No notes added.'}
+                                </p>
+                            )}
+                        </div>
 
+                        {/* 3. Delete Button */}
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="mt-4 w-full text-red-600 hover:bg-red-50 text-sm font-semibold py-2 rounded-xl transition duration-150 border border-red-300 shadow-sm"
+                        >
+                            Delete Goal
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+        
+        const AddGoalForm = ({ db, userId }) => {
+            const [name, setName] = useState('');
+            const [startDate, setStartDate] = useState(getCurrentDateString());
+            const [endDate, setEndDate] = useState('');
+            const [notes, setNotes] = useState('');
+            
+            const [stepsDraft, setStepsDraft] = useState([]); 
+            const [newStepDescription, setNewStepDescription] = useState('');
+            const [newStepEndDate, setNewStepEndDate] = useState(''); // New state for task end date
+            
+            const [isFormExpanded, setIsFormExpanded] = useState(true);
+            const [isNotesExpanded, setIsNotesExpanded] = useState(false);
+            const [isStepsExpanded, setIsStepsExpanded] = useState(true);
+
+            const handleAddStepDraft = (e) => {
+                e.preventDefault(); 
+                if (!newStepDescription.trim()) return;
+
+                const newStep = {
+                    id: `draft-${Date.now()}-${Math.random()}`, 
+                    description: newStepDescription.trim(),
+                    isCompleted: false,
+                    startDate: '', // Start date for draft tasks is left blank initially
+                    endDate: newStepEndDate, 
+                };
+
+                setStepsDraft([...stepsDraft, newStep]);
+                setNewStepDescription('');
+                setNewStepEndDate(''); // Reset date input
+            };
+
+            const handleRemoveStepDraft = (idToRemove) => {
+                setStepsDraft(stepsDraft.filter(step => step.id !== idToRemove));
+            };
+
+
+            const handleAddGoal = async (e) => {
+                e.preventDefault();
+                if (!name.trim() || !db || !userId) return;
+
+                try {
+                    await addDoc(collection(db, getCollectionPath(userId)), {
+                        name: name.trim(),
+                        startDate: startDate,
+                        endDate: endDate,
+                        notes: notes.trim(),
+                        steps: stepsDraft, 
+                        createdAt: new Date(),
+                    });
+                    
+                    // Reset all form fields
+                    setName('');
+                    setStartDate(getCurrentDateString());
+                    setEndDate('');
+                    setNotes('');
+                    setStepsDraft([]);
+                    setNewStepDescription('');
+                    setNewStepEndDate('');
+                    setIsFormExpanded(false); 
+                    setIsNotesExpanded(false); 
+                    setIsStepsExpanded(true); 
+                } catch (e) {
+                    console.error("Error adding document: ", e);
+                }
+            };
+
+            return (
+                <div className="bg-white p-6 rounded-2xl shadow-xl mb-8 border border-gray-100">
+                    <div className="flex justify-between items-center mb-4 pb-2 border-b">
+                        <h2 className="text-2xl font-bold text-gray-800">New Goal</h2>
+                        <button
+                            onClick={() => setIsFormExpanded(!isFormExpanded)}
+                            type="button"
+                            className="p-1 text-gray-600 hover:text-blue-600 rounded-full transition duration-150"
+                            aria-label={isFormExpanded ? "Collapse Form" : "Expand Form"}
+                        >
+                            <svg className={`w-6 h-6 transition-transform ${isFormExpanded ? 'rotate-180' : 'rotate-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                    </div>
+                    
+                    {/* Collapsible Form Content */}
+                    <div className={`overflow-hidden transition-all duration-300 ${isFormExpanded ? 'max-h-[1500px]' : 'max-h-0'}`}>
+                        <form onSubmit={handleAddGoal} className="space-y-4">
+                            
+                            {/* Goal Name Input */}
+                            <div>
+                                <label htmlFor="goal-name" className="block text-sm font-medium text-gray-700 mb-1">Goal Name</label>
+                                <input
+                                    id="goal-name"
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder="e.g., Launch New Project"
+                                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                                    required
+                                />
                             </div>
-
-                            <div class="flex-grow min-w-0">
-                                <p class="text-base sm:text-lg font-medium ${textClass} break-words">${goal.text}</p>
-                                <div class="flex flex-wrap items-center mt-1 text-xs sm:text-sm text-gray-500 space-x-2 sm:space-x-3">
-                                    <span class="font-semibold ${isCompleted ? 'text-green-500' : 'text-red-500'}">${dueText}</span>
-                                    <div class="space-x-1 hidden sm:block">${tagBadges}</div>
+                            
+                            {/* Dates Input */}
+                            <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                                <div className="w-full sm:w-1/2">
+                                    <label htmlFor="goal-start" className="block text-sm font-medium text-gray-700 mb-1">Goal Start Date</label>
+                                    <input
+                                        id="goal-start"
+                                        type="date"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        className="w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                                    />
+                                </div>
+                                <div className="w-full sm:w-1/2">
+                                    <label htmlFor="goal-end" className="block text-sm font-medium text-gray-700 mb-1">Overall Target Date</label>
+                                    <input
+                                        id="goal-end"
+                                        type="date"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        className="w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                                    />
                                 </div>
                             </div>
 
-                            <div class="flex items-center ml-2 sm:ml-4 flex-shrink-0 space-x-2">
-                                
-                                <button onclick="toggleSteps('${goal.id}')"
-                                        class="p-2 text-blue-500 rounded-full hover:bg-blue-100 transition duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <svg id="chevron-${goal.id}" class="h-5 w-5 rotate-0 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            {/* Steps Drafting Section - COLLAPSIBLE */}
+                            <div className="p-4 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsStepsExpanded(!isStepsExpanded)}
+                                    className="w-full text-left flex justify-between items-center text-xl font-bold text-gray-700 hover:text-blue-600 transition duration-150 mb-3"
+                                >
+                                    <span>Initial Tasks ({stepsDraft.length})</span>
+                                    <svg className={`w-5 h-5 transition-transform ${isStepsExpanded ? 'rotate-180' : 'rotate-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                                 </button>
                                 
-                                <button onclick="deleteGoal('${goal.id}')"
-                                        class="delete-btn p-2 text-red-500 rounded-full hover:bg-red-100 transition duration-150 focus:outline-none focus:ring-2 focus:ring-red-500">
-                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
-                            </div>
-                        </div>
+                                <div className={`overflow-hidden transition-all duration-300 ${isStepsExpanded ? 'max-h-96' : 'max-h-0'}`}>
+                                    {/* Drafted Steps List */}
+                                    {stepsDraft.length > 0 && (
+                                        <ul className="space-y-2 mb-4 max-h-40 overflow-y-auto pr-2">
+                                            {stepsDraft.map((step, index) => (
+                                                <li key={step.id} className="flex justify-between items-center text-sm p-2 bg-white rounded-lg border border-gray-100 shadow-sm">
+                                                    <div className="flex-grow min-w-0">
+                                                        <span className="text-gray-700 block truncate">{index + 1}. {step.description}</span>
+                                                        {step.endDate && <span className="text-gray-500 text-xs">Target: {formatDate(step.endDate)}</span>}
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveStepDraft(step.id)}
+                                                        className="text-red-500 hover:text-red-700 p-1 rounded-full transition flex-shrink-0"
+                                                        title="Remove Task"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
 
-                        <div id="steps-${goal.id}" class="hidden p-4 pt-0 border-t border-gray-200">
-                            <div class="sm:hidden mb-2 space-x-1">${tagBadges}</div>
-                            ${goalStepsContent}
+                                    {/* New Step Input Group */}
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-medium text-gray-700">New Task Details</label>
+                                        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                                            <input
+                                                type="text"
+                                                value={newStepDescription}
+                                                onChange={(e) => setNewStepDescription(e.target.value)}
+                                                placeholder="Task Description"
+                                                className="flex-grow p-2 border border-gray-300 rounded-lg text-sm focus:ring-green-500 focus:border-green-500 transition duration-150"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        handleAddStepDraft(e);
+                                                    }
+                                                }}
+                                            />
+                                            <input
+                                                type="date"
+                                                value={newStepEndDate}
+                                                onChange={(e) => setNewStepEndDate(e.target.value)}
+                                                className="sm:w-1/3 p-2 border border-gray-300 rounded-lg text-sm"
+                                                title="Task Due Date (Optional)"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleAddStepDraft}
+                                            className="w-full bg-green-600 hover:bg-green-700 text-white font-medium text-sm px-4 py-2 rounded-lg transition duration-200 shadow-md"
+                                            title="Click to add task"
+                                        >
+                                            Add Task to Goal
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Goal Notes Input - Collapsible */}
+                            <div className="border-t pt-4 border-gray-200">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsNotesExpanded(!isNotesExpanded)}
+                                    className="w-full text-left flex justify-between items-center text-md font-bold text-gray-700 hover:text-blue-600 transition duration-150"
+                                >
+                                    <span>Notes (Optional)</span>
+                                    <svg className={`w-5 h-5 transition-transform ${isNotesExpanded ? 'rotate-180' : 'rotate-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </button>
+                                
+                                <div className={`overflow-hidden transition-all duration-300 ${isNotesExpanded ? 'max-h-60 mt-3' : 'max-h-0'}`}>
+                                    <textarea
+                                        id="goal-notes"
+                                        value={notes}
+                                        onChange={(e) => setNotes(e.target.value)}
+                                        placeholder="Add motivation, strategy, or long-form notes here."
+                                        rows="3"
+                                        className="w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Submit Button */}
+                            <button
+                                type="submit"
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md transition duration-200 transform hover:scale-[1.01] mt-6"
+                            >
+                                Start Goal
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+
+        // Custom Modal Component (to replace window.confirm/alert)
+        const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel, title }) => {
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={onCancel}>
+                    <div className="bg-white rounded-xl shadow-2xl p-6 w-11/12 max-w-sm" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-red-600 mb-3">{title}</h3>
+                        <p className="text-gray-700 mb-6">{message}</p>
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={onCancel}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={onConfirm}
+                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition"
+                            >
+                                Delete
+                            </button>
                         </div>
                     </div>
-                `;
-            }).join('');
-            
-            updateFilterButtons(currentFilter);
-        }
-
-        window.onload = function() {
-            updateFilterButtons('All');
+                </div>
+            );
         };
+
+
+        // --- Main Application Component ---
+
+        const App = () => {
+            const { db, userId, isAuthReady } = useFirebaseSetup();
+            const { goals, isLoading } = useGoalData(db, userId, isAuthReady);
+
+            if (!isAuthReady) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+                        <div className="text-center text-gray-600">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3"></div>
+                            Loading...
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gray-50 font-sans p-4 sm:p-6">
+                    <div className="max-w-xl mx-auto">
+                        <header className="py-6 mb-8 text-center">
+                            <h1 className="text-4xl font-extrabold text-blue-700 mb-1">Zenith</h1>
+                            {userId && (
+                                <p className="text-xs text-gray-400 mt-2 p-1 bg-gray-100 rounded-lg inline-block">
+                                    User ID: {userId}
+                                </p>
+                            )}
+                        </header>
+
+                        {/* Goal List (Now at the top) */}
+                        <h2 className="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">My Goals</h2>
+                        {isLoading ? (
+                            <div className="text-center text-gray-500 p-8">Loading goals...</div>
+                        ) : goals.length === 0 ? (
+                            <div className="text-center bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 rounded-lg mb-8">
+                                <p className="font-semibold">You have no active goals.</p>
+                                <p className="text-sm">Add them below.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {goals.map(goal => (
+                                    <GoalItem key={goal.id} goal={goal} db={db} userId={userId} />
+                                ))}
+                            </div>
+                        )}
+                        
+                        {/* Add Goal Form (Now at the bottom, and collapsible) */}
+                        {db && userId ? <AddGoalForm db={db} userId={userId} /> : <div className="text-center text-red-500 mb-8">Database not ready.</div>}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Execute React Rendering ---
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 
     </script>
 </body>
