@@ -46,7 +46,7 @@
             <!-- Goals will be dynamically inserted here -->
         </div>
         
-        <!-- GOAL CREATION FORM (REDUCED PADDING) -->
+        <!-- GOAL CREATION FORM -->
         <div id="add-goal-container" class="bg-white p-4 rounded-2xl shadow-xl border border-gray-100">
             <!-- Reduced spacing between header and content -->
             <div class="flex justify-between items-center mb-1 pb-1 border-b">
@@ -62,45 +62,44 @@
             </div>
             
             <div id="add-goal-form-content" class="details-container expanded">
-                <!-- Reduced form spacing (space-y-2) -->
-                <form id="add-goal-form" class="space-y-2">
+                <!-- Removed space-y-2. Spacing is now handled by mb-3/mt-3 on direct children -->
+                <form id="add-goal-form">
                     
-                    <!-- Goal Name Input -->
-                    <div>
+                    <!-- Goal Name Input (Added mb-3) -->
+                    <div class="mb-3">
                         <label for="goal-name" class="block text-sm font-medium text-gray-700 mb-1">Goal Name</label>
                         <input id="goal-name" type="text" placeholder="e.g., Launch New Project" class="form-input w-full p-2 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150" required />
                     </div>
                     
-                    <!-- Goal Dates Input -->
-                    <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                    <!-- Goal Dates Input (Added mb-3) -->
+                    <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 mb-3">
                         <div class="w-full sm:w-1/2">
                             <label for="goal-start" class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                            <input id="goal-start" type="date" class="form-input w-full p-2 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150" />
+                            <input id="goal-start" type="date" class="form-input w-full p-2 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150 text-sm" />
                         </div>
                         <div class="w-full sm:w-1/2">
                             <label for="goal-end" class="block text-sm font-medium text-gray-700 mb-1">Target Date</label>
-                            <input id="goal-end" type="date" class="form-input w-full p-2 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150" />
+                            <input id="goal-end" type="date" class="form-input w-full p-2 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150 text-sm" />
                         </div>
                     </div>
 
-                    <!-- Tasks Drafting Section -->
+                    <!-- Tasks Drafting Section - NO margin needed at the top here -->
                     <div class="p-3 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
-                        <!-- Content remains expanded as the toggle button is gone -->
-                        <div id="tasks-draft-container" class="details-container expanded pt-0">
-                            <!-- Drafted Steps List (Reduced mb-2 and space-y-1) -->
-                            <ul id="steps-draft-list" class="space-y-1 mb-2 max-h-40 overflow-y-auto pr-2">
+                        <div id="tasks-draft-container" class="details-container expanded"> 
+                            <!-- Drafted Steps List: Note: mb-2 was removed in the previous revision -->
+                            <ul id="steps-draft-list" class="space-y-1 max-h-40 overflow-y-auto pr-2">
                                 <!-- Steps will be dynamically inserted here -->
                             </ul>
 
-                            <!-- New Step Input Group (Removed "Add Task" header) -->
+                            <!-- New Step Input Group (Removed mt-2 for reduced top gap) -->
                             <div class="space-y-2 pt-1 border-t border-gray-200">
-                                <!-- Task Description Input (Label now just "Task Description") -->
+                                <!-- Task Description Input -->
                                 <div>
                                     <label for="new-step-desc" class="block text-sm font-medium text-gray-700 mb-1">Task Description</label>
                                     <input id="new-step-desc" type="text" placeholder="e.g., Finalize design mockups" class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150" />
                                 </div>
                                 
-                                <!-- Task Dates Input (Removed Opt.) -->
+                                <!-- TASK DATES: Side-by-side -->
                                 <div class="flex space-x-3">
                                     <div class="w-1/2">
                                         <label for="new-step-start-date" class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
@@ -127,11 +126,11 @@
                         </div>
                     </div>
                     
-                    <!-- Notes Section (Collapsed by default) -->
-                    <div class="p-3 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
-                        <button type="button" id="toggle-notes" class="w-full text-left flex justify-between items-center text-lg font-bold text-gray-700 hover:text-blue-600 transition duration-150 mb-2" aria-expanded="false">
+                    <!-- Notes Section (Added mt-3 for spacing) -->
+                    <div class="p-3 bg-gray-50 rounded-xl shadow-inner border border-gray-200 mt-3">
+                        <!-- Changed text-lg to text-sm and removed mb-2 for consistency -->
+                        <button type="button" id="toggle-notes" class="w-full text-left flex justify-between items-center text-sm font-bold text-gray-700 hover:text-blue-600 transition duration-150" aria-expanded="false">
                             <span>Notes</span>
-                            <!-- Icon is unrotated, correctly indicating a collapsed section -->
                             <svg class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </button>
                         <!-- details-container makes this section collapsed initially -->
@@ -140,7 +139,7 @@
                         </div>
                     </div>
 
-                    <!-- Submit Button (CHANGED TO BLUE) -->
+                    <!-- Submit Button -->
                     <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-lg py-3 rounded-xl transition duration-200 shadow-lg shadow-blue-300/50 mt-4">
                         CREATE GOAL
                     </button>
@@ -187,7 +186,6 @@
          */
         const saveGoals = () => {
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(goals));
-            // Logging status directly to console since the UI element was removed
             console.log('STATUS: Data saved successfully!'); 
             renderGoals();
         };
@@ -239,32 +237,28 @@
         // --- GOAL RENDERING ---
 
         /**
-         * Calculates the progress percentage for a goal.
+         * Calculates the progress percentage for a goal and the daily completion count.
          * @param {object} goal - The goal object.
-         * @returns {number} The progress percentage (0-100).
+         * @returns {{progressPercent: number, completedToday: number, totalSteps: number}} The progress metrics.
          */
         const calculateProgress = (goal) => {
             const totalSteps = goal.steps.length;
-            if (totalSteps === 0) return 0;
-
             const today = getTodayDateString();
+            
+            if (totalSteps === 0) return { progressPercent: 0, completedToday: 0, totalSteps: 0 };
 
-            const completedStepsCount = goal.steps.reduce((count, step) => {
-                if (step.isRecurring) {
-                    // Recurring tasks are complete for the day if today's date is in the log
-                    if (step.completionLog && step.completionLog.includes(today)) {
-                        return count + 1;
-                    }
-                } else {
-                    // Non-recurring tasks are complete if the flag is set
-                    if (step.isCompleted) {
-                        return count + 1;
-                    }
-                }
-                return count;
+            const completedToday = goal.steps.reduce((count, step) => {
+                const isStepCompleted = step.isRecurring
+                    ? (step.completionLog && step.completionLog.includes(today))
+                    : step.isCompleted;
+                
+                return count + (isStepCompleted ? 1 : 0);
             }, 0);
 
-            return Math.round((completedStepsCount / totalSteps) * 100);
+            // Progress is calculated based on completed steps today / total steps
+            const progressPercent = Math.round((completedToday / totalSteps) * 100);
+
+            return { progressPercent, completedToday, totalSteps };
         };
 
         /**
@@ -291,71 +285,102 @@
         };
 
         /**
+         * Toggles a nested details container (used for Add Task form and Notes).
+         * @param {HTMLElement} button - The button element that was clicked.
+         * @param {string} contentId - The ID of the details-container to toggle.
+         */
+        const handleToggleNestedDetails = (button, contentId) => {
+            const content = document.getElementById(contentId);
+            const svg = button.querySelector('svg');
+            
+            if (!content || !svg) return;
+
+            content.classList.toggle('expanded');
+            svg.classList.toggle('rotate-180');
+            button.setAttribute('aria-expanded', content.classList.contains('expanded'));
+        };
+
+
+        /**
          * Creates the full HTML element for a single goal.
          * @param {object} goal - The goal object.
          * @returns {HTMLElement} The goal element.
          */
         const createGoalElement = (goal) => {
-            const progressPercent = calculateProgress(goal);
-            const totalSteps = goal.steps.length;
+            const { progressPercent, completedToday, totalSteps } = calculateProgress(goal);
             const isGoalCompleted = totalSteps > 0 && progressPercent === 100;
-            const isExpanded = goal.isExpanded || false;
+            const isExpanded = goal.isExpanded || false; // Check expansion state
             const today = getTodayDateString();
 
             // Use Emerald for success (complete) and Blue for in-progress
             const baseColor = isGoalCompleted ? 'emerald' : 'blue';
 
             const goalDiv = document.createElement('div');
-            // Simplified padding
             goalDiv.className = `bg-white shadow-xl rounded-2xl p-4 border-t-4 border-${baseColor}-500 transition-shadow hover:shadow-2xl`;
             goalDiv.setAttribute('data-goal-id', goal.id);
 
-            // --- SIMPLIFIED NOTES SECTION (pt-3 mt-3 instead of pt-4 mt-4) ---
+            // --- NOTES/EDITING SECTION (Styled to match the Add Goal form) ---
             const hasNotes = !!goal.notes;
             const notesContent = hasNotes ? goal.notes : 'No context or key resources added.';
             const notesTextClass = hasNotes ? 'text-gray-700' : 'text-gray-500 italic';
             
-            // Generate Notes/Editing HTML
             const notesSectionHtml = `
-                <div class="notes-section border-t pt-3 mt-3 border-gray-200">
-                    <h4 class="text-sm font-semibold text-gray-700 flex justify-between items-center mb-1">
-                        Notes
-                        <button
-                            data-goal-id="${goal.id}"
-                            data-is-editing="false"
-                            onclick="handleEditNotes(this)"
-                            class="edit-notes-btn text-xs text-${baseColor}-600 hover:text-${baseColor}-800 transition font-medium px-2 py-0.5 rounded-md bg-gray-100 hover:bg-gray-200"
-                            title="Edit Notes"
-                        >
-                            Edit
-                        </button>
-                    </h4>
-                    <div class="notes-display ${notesTextClass} text-sm whitespace-pre-wrap px-1">
-                        ${notesContent}
-                    </div>
-                    <div class="notes-edit hidden mt-2">
-                        <textarea
-                            rows="3"
-                            class="notes-textarea w-full p-2 border border-${baseColor}-300 rounded-lg text-sm focus:ring-${baseColor}-500 focus:border-${baseColor}-500 transition duration-150"
-                        >${goal.notes || ''}</textarea>
-                        <div class="flex justify-end space-x-2 mt-2">
-                            <button
-                                onclick="handleCancelNotes('${goal.id}', this)"
-                                class="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onclick="handleSaveNotes('${goal.id}', this.closest('.notes-section').querySelector('.notes-textarea').value)"
-                                class="px-3 py-1 text-sm font-medium text-white bg-${baseColor}-600 rounded-lg hover:bg-${baseColor}-700 transition"
-                            >
-                                Save
-                            </button>
+                <!-- Wrapper matching the Add Goal Notes section -->
+                <div class="p-3 bg-gray-50 rounded-xl shadow-inner border border-gray-200 mt-3">
+                    <button
+                        type="button" 
+                        data-goal-id="${goal.id}"
+                        onclick="handleToggleNestedDetails(this, 'goal-notes-content-${goal.id}')"
+                        class="w-full text-left flex justify-between items-center text-sm font-bold text-gray-700 hover:text-${baseColor}-600 transition duration-150"
+                        aria-expanded="false"
+                        title="Toggle Notes Section"
+                    >
+                        <span>Notes</span>
+                        <svg class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    
+                    <div id="goal-notes-content-${goal.id}" class="details-container">
+                        <div class="pt-2">
+                            <h4 class="text-sm font-semibold text-gray-700 flex justify-between items-center mb-1">
+                                Goal Notes
+                                <button
+                                    data-goal-id="${goal.id}"
+                                    data-is-editing="false"
+                                    onclick="handleEditNotes(this)"
+                                    class="edit-notes-btn text-xs text-${baseColor}-600 hover:text-${baseColor}-800 transition font-medium px-2 py-0.5 rounded-md bg-white hover:bg-gray-100 border border-gray-200"
+                                    title="Edit Notes"
+                                >
+                                    Edit
+                                </button>
+                            </h4>
+                            <div class="notes-display ${notesTextClass} text-sm whitespace-pre-wrap px-1">
+                                ${notesContent}
+                            </div>
+                            <div class="notes-edit hidden mt-2">
+                                <textarea
+                                    rows="3"
+                                    class="notes-textarea w-full p-2 border border-${baseColor}-300 rounded-lg text-sm focus:ring-${baseColor}-500 focus:border-${baseColor}-500 transition duration-150"
+                                >${goal.notes || ''}</textarea>
+                                <div class="flex justify-end space-x-2 mt-2">
+                                    <button
+                                        onclick="handleCancelNotes('${goal.id}', this)"
+                                        class="px-3 py-1 text-sm font-medium text-gray-700 bg-white rounded-lg hover:bg-gray-100 transition border border-gray-300"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onclick="handleSaveNotes('${goal.id}', this.closest('.notes-edit').querySelector('.notes-textarea').value)"
+                                        class="px-3 py-1 text-sm font-medium text-white bg-${baseColor}-600 rounded-lg hover:bg-${baseColor}-700 transition shadow-md"
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             `;
-            // --- END NOTES SECTION REFINEMENT ---
+            // --- END NOTES SECTION ---
 
 
             // Generate Steps List HTML
@@ -366,7 +391,8 @@
                         ? (step.completionLog && step.completionLog.includes(today)) 
                         : step.isCompleted;
 
-                    const datesHtml = (step.startDate || step.endDate)
+                    // CONDITIONAL DATES: Only show dates if the goal is expanded
+                    const datesHtml = isExpanded && (step.startDate || step.endDate)
                         ? `<span class="text-xs text-gray-400">Start: ${formatDate(step.startDate)} | Target: ${formatDate(step.endDate)}</span>`
                         : '';
                     
@@ -388,8 +414,83 @@
                         </div>
                     </li>
                 `}).join('')
-                : '<p class="text-center text-gray-500 italic p-2">No tasks yet. Add some below!</p>';
+                : '<p class="text-center text-gray-500 italic p-2">No tasks yet. Click "+ Add New Task" to start!</p>';
             
+            // --- ADD TASK COLLAPSIBLE FORM ---
+            const addTaskSectionHtml = `
+                <div class="mb-3 p-3 bg-white rounded-xl space-y-3 shadow-sm border border-gray-200">
+                    <button
+                        type="button" 
+                        data-goal-id="${goal.id}"
+                        onclick="handleToggleNestedDetails(this, 'add-task-form-content-${goal.id}')"
+                        class="w-full text-left flex justify-between items-center text-base font-bold text-teal-700 hover:text-teal-600 transition duration-150 mb-2 border-b border-gray-100 pb-2"
+                        aria-expanded="false"
+                        title="Toggle Add Task Form"
+                    >
+                        <span>+ Add New Task</span>
+                        <svg class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    
+                    <div id="add-task-form-content-${goal.id}" class="details-container">
+                        <div class="space-y-3 pt-1">
+                            <!-- Task Description Input -->
+                            <div>
+                                <label for="new-task-desc-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Task Description</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g., Complete 10 exercises"
+                                    id="new-task-desc-${goal.id}"
+                                    class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-teal-500 focus:border-teal-500 transition duration-150"
+                                    required
+                                />
+                            </div>
+                            <!-- TASK DATES: Side-by-side (Inputs use text-sm) -->
+                            <div class="flex space-x-3">
+                                <div class="w-1/2">
+                                    <label for="new-task-start-date-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                                    <input
+                                        type="date"
+                                        id="new-task-start-date-${goal.id}"
+                                        class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                        title="Task Start Date"
+                                    />
+                                </div>
+                                <div class="w-1/2">
+                                    <label for="new-task-end-date-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Target Date</label>
+                                    <input
+                                        type="date"
+                                        id="new-task-end-date-${goal.id}"
+                                        class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                        title="Task Due Date"
+                                    />
+                                </div>
+                            </div>
+
+                            <!-- Recurring Checkbox -->
+                            <div class="flex items-center pt-1">
+                                <input id="new-task-recurring-${goal.id}" type="checkbox" class="h-4 w-4 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300 toggle-step" />
+                                <label for="new-task-recurring-${goal.id}" class="ml-2 block text-sm font-medium text-gray-700">
+                                    Daily Recurring Task
+                                </label>
+                            </div>
+                            
+                            <!-- Task Add Button -->
+                            <button
+                                onclick="handleAddStep('${goal.id}')"
+                                class="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm py-2 rounded-lg transition duration-200 shadow-md mt-3"
+                            >
+                                Add Task
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Conditional "Tasks" header (ONLY VISIBLE WHEN EXPANDED)
+            const taskHeaderHtml = isExpanded 
+                ? `<h4 class="text-lg font-bold text-gray-700 mb-2">Tasks</h4>`
+                : '';
+
 
             goalDiv.innerHTML = `
                 <div class="flex items-center justify-between mb-2 cursor-pointer" onclick="handleToggleDetails('${goal.id}')">
@@ -400,6 +501,9 @@
                     
                     <!-- Progress Percentage & Completion Status -->
                     <div class="flex items-center space-x-2 flex-shrink-0">
+                        <!-- Task Summary added here -->
+                        <span class="text-sm font-medium text-gray-500 hidden sm:inline">${completedToday}/${totalSteps} tasks</span>
+                        
                         ${isGoalCompleted ? `
                             <svg class="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" title="Completed"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             <span class="text-lg font-extrabold text-emerald-600">100%</span>
@@ -421,75 +525,27 @@
                     ></div>
                 </div>
                 
-                <!-- Expanded Content -->
+                <!-- Dates Summary (ALWAYS VISIBLE, now text-xs) -->
+                <p class="text-xs text-gray-600 mb-3 font-medium p-2 bg-gray-50 rounded-lg border border-gray-200 mt-3">
+                    <span class="font-semibold text-gray-700">Start:</span> ${formatDate(goal.startDate)} | <span class="font-semibold text-gray-700">Target:</span> ${formatDate(goal.endDate)}
+                </p>
+
+                <!-- Tasks Header (ONLY VISIBLE WHEN EXPANDED) -->
+                ${taskHeaderHtml}
+                
+                <!-- Steps List (ALWAYS VISIBLE) -->
+                <ul class="space-y-2 mb-3 max-h-60 overflow-y-auto pr-1">
+                    ${stepsHtml}
+                </ul>
+
+                
+                <!-- Expanded Content (Now only contains editing/management features) -->
                 <div class="goal-details-content details-container ${isExpanded ? 'expanded' : ''}">
                     
-                    <!-- Dates Summary -->
-                    <p class="text-sm text-gray-600 mb-3 font-medium p-2 bg-gray-50 rounded-lg border border-gray-200">
-                        <span class="font-semibold text-gray-700">Timeline:</span> Start: ${formatDate(goal.startDate)} | Target: ${formatDate(goal.endDate)}
-                    </p>
-
-                    <!-- Steps List -->
-                    <h4 class="text-lg font-bold text-gray-700 mb-2">Tasks (${goal.steps.filter(s => s.isCompleted || (s.isRecurring && s.completionLog && s.completionLog.includes(today))).length}/${totalSteps})</h4>
-                    <ul class="space-y-2 mb-3 max-h-60 overflow-y-auto pr-1">
-                        ${stepsHtml}
-                    </ul>
-
-                    <!-- 1. Add Step Form (Simplified - Removed "Add Task" header) -->
-                    <div class="mb-3 p-3 bg-white rounded-xl space-y-3 shadow-sm border border-gray-200">
-                        <!-- Removed redundant "Add New Task" title here -->
-                        
-                        <!-- Task Description Input (Updated Label) -->
-                        <div>
-                            <label for="new-task-desc-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Task Description</label>
-                            <input
-                                type="text"
-                                placeholder="e.g., Complete 10 exercises"
-                                id="new-task-desc-${goal.id}"
-                                class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-teal-500 focus:border-teal-500 transition duration-150"
-                                required
-                            />
-                        </div>
-                        <!-- Task Dates Input (Removed Opt.) -->
-                        <div class="flex space-x-3">
-                            <div class="w-1/2">
-                                <label for="new-task-start-date-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                                <input
-                                    type="date"
-                                    id="new-task-start-date-${goal.id}"
-                                    class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm"
-                                    title="Task Start Date"
-                                />
-                            </div>
-                            <div class="w-1/2">
-                                <label for="new-task-end-date-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Target Date</label>
-                                <input
-                                    type="date"
-                                    id="new-task-end-date-${goal.id}"
-                                    class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm"
-                                    title="Task Due Date"
-                                />
-                            </div>
-                        </div>
-
-                         <!-- Recurring Checkbox -->
-                        <div class="flex items-center pt-1">
-                            <input id="new-task-recurring-${goal.id}" type="checkbox" class="h-4 w-4 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300 toggle-step" />
-                            <label for="new-task-recurring-${goal.id}" class="ml-2 block text-sm font-medium text-gray-700">
-                                Daily Recurring Task
-                            </label>
-                        </div>
-                        
-                        <!-- Task Add Button (Teal) -->
-                        <button
-                            onclick="handleAddStep('${goal.id}')"
-                            class="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm py-2 rounded-lg transition duration-200 shadow-md mt-3"
-                        >
-                            Add Task
-                        </button>
-                    </div>
+                    <!-- 1. Add Step Form (COLLAPSIBLE) -->
+                    ${addTaskSectionHtml}
                     
-                    <!-- 2. Notes Section -->
+                    <!-- 2. Notes Section (COLLAPSIBLE by default, now matches Add Goal form) -->
                     ${notesSectionHtml}
 
                     <!-- 3. Delete Button -->
@@ -605,9 +661,10 @@
             const goalId = goalDiv.getAttribute('data-goal-id');
             const isEditing = button.getAttribute('data-is-editing') === 'true';
             
-            const notesDisplay = goalDiv.querySelector('.notes-display');
-            const notesEdit = goalDiv.querySelector('.notes-edit');
-            const notesTextarea = goalDiv.querySelector('.notes-textarea');
+            const notesSection = button.closest('.details-container').querySelector('.pt-2'); // Find the specific note content container
+            const notesDisplay = notesSection.querySelector('.notes-display');
+            const notesEdit = notesSection.querySelector('.notes-edit');
+            const notesTextarea = notesSection.querySelector('.notes-textarea');
 
             if (isEditing) {
                 // Exit edit mode (should usually be handled by save/cancel)
@@ -643,8 +700,8 @@
 
             // Exit edit mode manually after saving
             const goalDiv = document.querySelector(`[data-goal-id="${goalId}"]`);
-            const button = goalDiv.querySelector('.edit-notes-btn');
-            handleEditNotes(button);
+            const editButton = goalDiv.querySelector('.edit-notes-btn');
+            if (editButton) handleEditNotes(editButton);
         };
 
         /**
@@ -655,7 +712,7 @@
         const handleCancelNotes = (goalId, button) => {
              const goalDiv = document.querySelector(`[data-goal-id="${goalId}"]`);
              const editButton = goalDiv.querySelector('.edit-notes-btn');
-             handleEditNotes(editButton); // Call edit handler to toggle back
+             if (editButton) handleEditNotes(editButton); // Call edit handler to toggle back
         }
 
         /**
@@ -720,11 +777,11 @@
             list.innerHTML = '';
 
             if (stepsDraft.length === 0) {
-                // No placeholder needed, just an empty list
                 return;
             }
 
             stepsDraft.forEach((step, index) => {
+                // Dates are now smaller (text-xs)
                 const datesHtml = (step.startDate || step.endDate)
                     ? `<span class="text-gray-500 text-xs">Start: ${formatDate(step.startDate)} | Target: ${formatDate(step.endDate)}</span>`
                     : '';
@@ -874,13 +931,15 @@
             const setupToggle = (buttonId, contentId) => {
                 const button = document.getElementById(buttonId);
                 const content = document.getElementById(contentId);
-                const svg = button.querySelector('svg');
                 
-                button.addEventListener('click', () => {
-                    content.classList.toggle('expanded');
-                    svg.classList.toggle('rotate-180');
-                    button.setAttribute('aria-expanded', content.classList.contains('expanded'));
-                });
+                if (button && content) {
+                     const svg = button.querySelector('svg');
+                    button.addEventListener('click', () => {
+                        content.classList.toggle('expanded');
+                        if (svg) svg.classList.toggle('rotate-180');
+                        button.setAttribute('aria-expanded', content.classList.contains('expanded'));
+                    });
+                }
             };
 
             setupToggle('toggle-add-form', 'add-goal-form-content');
