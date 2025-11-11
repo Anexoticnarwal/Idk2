@@ -4,12 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Advanced Goal Tracker</title>
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Inter font -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
         body { font-family: 'Inter', sans-serif; }
+        /* Custom styles for mobile-friendly goal tile visibility */
+        .goal-tile:hover .delete-btn {
+            opacity: 1;
+        }
+        .delete-btn {
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        /* Override for mobile/small screens to always show options button */
+        @media (max-width: 640px) {
+            .delete-btn {
+                opacity: 1; /* Always show options icon on mobile */
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen p-4 sm:p-8">
@@ -21,19 +33,20 @@
             <div id="auth-status" class="text-sm text-gray-400 mt-2">Loading authentication...</div>
         </header>
 
-        <!-- Goal Input Form -->
         <div class="bg-white p-6 rounded-xl shadow-lg mb-8 border border-gray-100">
             <h2 class="text-xl font-semibold mb-4 text-gray-700">Set a New Goal</h2>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input id="new-goal-text" type="text" placeholder="Goal Description (e.g., Finish Q4 report)"
-                       class="col-span-3 md:col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        class="col-span-3 md:col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                 
                 <input id="new-goal-due-date" type="date" title="Due Date"
-                       class="col-span-3 md:col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        class="col-span-3 md:col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
 
                 <input id="new-goal-tags" type="text" placeholder="Tags (comma-separated: work, health)"
-                       class="col-span-3 md:col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        class="col-span-3 md:col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <input id="new-goal-step-text" type="text" placeholder="Goal Steps/Visualization Keyword"
+                        class="col-span-3 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
             </div>
             <button onclick="addGoal()"
                     class="mt-4 w-full md:w-auto px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition duration-150 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
@@ -41,23 +54,20 @@
             </button>
         </div>
 
-        <!-- Filter and Visualization Controls -->
         <div class="bg-white p-6 rounded-xl shadow-lg mb-8 border border-gray-100">
             <h2 class="text-xl font-semibold mb-4 text-gray-700">Visualize Goals</h2>
             
-            <!-- Timeframe Filters - This div is the container we check against in JS -->
             <div class="flex flex-wrap gap-2 mb-4" id="filter-container">
-                <button class="filter-btn bg-gray-200 text-gray-700 hover:bg-blue-100" onclick="setFilter('All')">All Goals</button>
-                <button class="filter-btn bg-gray-200 text-gray-700 hover:bg-blue-100" onclick="setFilter('Daily')">Daily</button>
-                <button class="filter-btn bg-gray-200 text-gray-700 hover:bg-blue-100" onclick="setFilter('Weekly')">Weekly</button>
-                <button class="filter-btn bg-gray-200 text-gray-700 hover:bg-blue-100" onclick="setFilter('Monthly')">Monthly</button>
-                <button class="filter-btn bg-gray-200 text-gray-700 hover:bg-blue-100" onclick="setFilter('Yearly')">Yearly</button>
+                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-medium transition duration-150" onclick="setFilter('All')">All Goals</button>
+                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-medium transition duration-150" onclick="setFilter('Daily')">Daily</button>
+                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-medium transition duration-150" onclick="setFilter('Weekly')">Weekly</button>
+                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-medium transition duration-150" onclick="setFilter('Monthly')">Monthly</button>
+                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-medium transition duration-150" onclick="setFilter('Yearly')">Yearly</button>
             </div>
 
-            <!-- Tag Search Filter -->
             <div class="flex space-x-2">
                 <input id="tag-search-input" type="text" placeholder="Search by Tag (e.g., 'work')"
-                       class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                 <button onclick="searchByTag()"
                         class="px-4 py-3 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition duration-150 shadow-md">
                     Search
@@ -65,9 +75,7 @@
             </div>
         </div>
 
-        <!-- Goals List -->
         <div id="goals-list" class="space-y-4">
-            <!-- Goals will be rendered here -->
             <div class="text-center p-8 text-gray-400" id="loading-indicator">
                 <svg class="animate-spin h-5 w-5 text-gray-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -77,17 +85,14 @@
             </div>
         </div>
         
-        <!-- User ID Display for Collaboration -->
         <div class="mt-8 pt-4 border-t border-gray-200 text-center">
             <p class="text-xs text-gray-400">Your collaborative ID (share to sync goals):</p>
             <code id="user-id-display" class="text-sm font-mono bg-gray-100 p-1 rounded text-gray-600">ID Loading...</code>
         </div>
     </div>
 
-    <!-- Firebase Imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // REMOVED 'setPersistence' and 'browserLocalPersistence' from imports
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, serverTimestamp, orderBy, where, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -120,9 +125,6 @@
             async function initializeAuth() {
                 if (!auth) return;
                 try {
-                    // FIX: Removed setPersistence to prevent "cannot connect to persistence layer" error.
-                    // Firebase will now default to session persistence (which works).
-                    
                     if (initialAuthToken) {
                         await signInWithCustomToken(auth, initialAuthToken);
                         console.log("Signed in with custom token.");
@@ -159,7 +161,6 @@
                 console.error("Cannot get collection ref: Database not initialized or User ID not set.");
                 return null;
             }
-            // Using the public data path structure for collaboration
             return collection(db, `artifacts/${appId}/public/data/goals`);
         }
         
@@ -182,10 +183,13 @@
             const textInput = document.getElementById('new-goal-text');
             const dateInput = document.getElementById('new-goal-due-date');
             const tagsInput = document.getElementById('new-goal-tags');
+            // NEW: Get the steps/image keyword input
+            const stepInput = document.getElementById('new-goal-step-text');
 
             const text = textInput.value.trim();
             const dueDate = dateInput.value; // YYYY-MM-DD string
             const tags = parseTags(tagsInput.value);
+            const stepText = stepInput.value.trim(); // NEW: Steps/Keyword
             
             if (!userId || !text) {
                 console.warn("Goal text or User ID missing.");
@@ -201,12 +205,15 @@
                     completed: false,
                     createdAt: serverTimestamp(),
                     userId: userId,
-                    dueDate: dueDate || null, // Store as null if empty
+                    dueDate: dueDate || null, 
                     tags: tags,
+                    // NEW: Store step/image keyword
+                    stepKeyword: stepText || 'goal tracking'
                 });
                 textInput.value = '';
                 dateInput.value = '';
                 tagsInput.value = '';
+                stepInput.value = ''; // Clear new input
                 console.log("Goal added successfully.");
             } catch (e) {
                 console.error("Error adding document: ", e);
@@ -223,10 +230,8 @@
             if (!goalsRef) return;
 
             try {
-                // Get the specific document reference
                 const goalDocRef = doc(goalsRef, goalId);
 
-                // Use a transaction to ensure atomic update
                 await runTransaction(db, async (transaction) => {
                     transaction.update(goalDocRef, {
                         completed: !currentStatus
@@ -240,6 +245,27 @@
         }
         
         /**
+         * Toggles visibility of goal steps.
+         */
+        window.toggleSteps = function(goalId) {
+            const stepsElement = document.getElementById(`steps-${goalId}`);
+            const chevronIcon = document.getElementById(`chevron-${goalId}`);
+
+            if (!stepsElement || !chevronIcon) return;
+
+            if (stepsElement.classList.contains('hidden')) {
+                stepsElement.classList.remove('hidden');
+                stepsElement.classList.add('animate-in', 'fade-in', 'slide-in-from-top-1');
+                chevronIcon.classList.remove('rotate-0');
+                chevronIcon.classList.add('rotate-180');
+            } else {
+                stepsElement.classList.add('hidden');
+                chevronIcon.classList.remove('rotate-180');
+                chevronIcon.classList.add('rotate-0');
+            }
+        }
+
+        /**
          * Deletes a goal document from Firestore.
          */
         window.deleteGoal = async function(goalId) {
@@ -249,7 +275,6 @@
             if (!goalsRef) return;
 
             try {
-                // Get the specific document reference
                 const goalDocRef = doc(goalsRef, goalId);
                 await deleteDoc(goalDocRef);
                 console.log(`Goal ${goalId} deleted.`);
@@ -267,7 +292,6 @@
             const goalsRef = getGoalsCollectionRef();
             if (!goalsRef) return;
 
-            // Simple query: get all goals, ordered by creation time
             const q = query(goalsRef, orderBy('createdAt', 'desc'));
 
             onSnapshot(q, (snapshot) => {
@@ -285,6 +309,7 @@
         }
         
         // --- 3. FILTERING LOGIC ---
+        // (Unchanged from previous fix, ensuring date consistency)
 
         window.setFilter = function(filterType) {
             currentFilter = filterType;
@@ -308,82 +333,68 @@
         }
 
         function updateFilterButtons(activeFilter) {
-            // FIX: Robust check for the container element first, which houses all filter buttons.
             const container = document.getElementById('filter-container');
             if (!container) return; 
 
-            // Get all filter buttons inside the container
             const filterButtons = Array.from(container.querySelectorAll('.filter-btn'));
 
             filterButtons.forEach(btn => {
                 if (!btn) return; 
 
-                // Reset styling for all buttons
                 btn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
                 btn.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-blue-100');
                 
-                // Highlight the active button
-                if (btn.textContent.toLowerCase().includes(activeFilter.toLowerCase())) {
+                if (btn.textContent.trim().toLowerCase() === activeFilter.toLowerCase() + ' goals' || 
+                    btn.textContent.trim().toLowerCase() === activeFilter.toLowerCase()) {
                     btn.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-blue-100');
                     btn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
                 }
             });
 
-            // Highlight search button if tag filter is active
             const searchBtn = document.querySelector('button[onclick="searchByTag()"]');
             
             if (searchBtn) { 
                 if (currentFilter !== 'All' && !['Daily', 'Weekly', 'Monthly', 'Yearly'].includes(currentFilter)) {
-                    // Tag filter is active
                     searchBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
-                    searchBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                    searchBtn.classList.add('bg-blue-600', 'hover:hover:bg-blue-700');
                 } else {
-                    // Default green color for search button
                     searchBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
                     searchBtn.classList.add('bg-green-500', 'hover:bg-green-600');
                 }
             }
         }
 
-        /**
-         * Core function to filter goals based on the current view/tag.
-         */
         function filterGoals(goals, filter) {
             const now = new Date();
-            now.setHours(0, 0, 0, 0); // Normalize time for date comparisons
+            now.setHours(0, 0, 0, 0); 
 
             if (filter === 'All') {
                 return goals;
             }
 
-            // --- Time-based Filtering ---
             if (['Daily', 'Weekly', 'Monthly', 'Yearly'].includes(filter)) {
                 return goals.filter(goal => {
                     if (!goal.dueDate) return false;
 
-                    const goalDate = new Date(goal.dueDate);
-                    goalDate.setHours(0, 0, 0, 0);
+                    const goalDate = new Date(goal.dueDate + 'T00:00:00'); 
+                    
+                    if (isNaN(goalDate)) return false;
 
                     if (filter === 'Daily') {
-                        // Goals due today
                         return goalDate.getTime() === now.getTime();
                     } else if (filter === 'Weekly') {
-                        // Goals due in the next 7 days (including today)
-                        const nextWeek = new Date(now);
-                        nextWeek.setDate(now.getDate() + 7);
-                        return goalDate >= now && goalDate < nextWeek;
+                        const oneWeek = 7 * 24 * 60 * 60 * 1000;
+                        const nextWeek = now.getTime() + oneWeek;
+                        return goalDate.getTime() >= now.getTime() && goalDate.getTime() < nextWeek;
                     } else if (filter === 'Monthly') {
-                        // Goals due in the current month
                         return goalDate.getFullYear() === now.getFullYear() && goalDate.getMonth() === now.getMonth();
                     } else if (filter === 'Yearly') {
-                        // Goals due in the current year
                         return goalDate.getFullYear() === now.getFullYear();
                     }
                     return false;
                 });
             }
 
-            // --- Tag-based Filtering ---
             if (filter) {
                 const targetTag = filter.toLowerCase();
                 return goals.filter(goal => 
@@ -394,17 +405,17 @@
             return goals;
         }
 
-        // --- 4. UI RENDERING ---
+        // --- 4. UI RENDERING (MOBILE-FRIENDLY TILE IMPLEMENTATION) ---
 
         function renderGoals() {
             const listElement = document.getElementById('goals-list');
             const filteredGoals = filterGoals(allGoals, currentFilter);
             
-            if (!listElement) return; // Defensive check for list container
+            if (!listElement) return;
 
             if (filteredGoals.length === 0) {
                 listElement.innerHTML = `<div class="p-8 text-center bg-white rounded-xl shadow-md text-gray-500">
-                    No goals found for the current view (${currentFilter}).
+                    No goals found for the current view (**${currentFilter}**).
                 </div>`;
                 return;
             }
@@ -413,43 +424,82 @@
                 const isCompleted = goal.completed;
                 const statusClass = isCompleted ? 'bg-green-50 border-green-200' : 'bg-white border-blue-200';
                 const textClass = isCompleted ? 'line-through text-gray-400' : 'text-gray-800';
-                const dueText = goal.dueDate ? `Due: ${new Date(goal.dueDate).toLocaleDateString()}` : 'No Deadline';
+                
+                const displayDate = goal.dueDate ? new Date(goal.dueDate + 'T00:00:00') : null;
+                const dueText = displayDate ? `Due: ${displayDate.toLocaleDateString()}` : 'No Deadline';
                 
                 const tagBadges = (goal.tags || []).map(tag => 
                     `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">#${tag}</span>`
                 ).join('');
 
+                // NEW: Goal Steps/Image content (Simulated steps)
+                const goalStepsContent = `
+                    <div class="space-y-2 pt-3">
+                        <h4 class="font-semibold text-gray-600 border-b pb-1">Actionable Steps</h4>
+                        <div class="flex items-start space-x-2 text-sm text-gray-700">
+                            <input type="checkbox" checked class="mt-1 h-4 w-4 text-blue-600 rounded">
+                            <span>Step 1: Define specific metrics for success.</span>
+                        </div>
+                        <div class="flex items-start space-x-2 text-sm text-gray-700">
+                            <input type="checkbox" class="mt-1 h-4 w-4 text-blue-600 rounded">
+                            <span>Step 2: Allocate 2 hours daily to this task.</span>
+                        </div>
+                        <div class="flex items-start space-x-2 text-sm text-gray-700">
+                            <input type="checkbox" class="mt-1 h-4 w-4 text-blue-600 rounded">
+                            <span>Step 3: Review progress on Friday.</span>
+                        </div>
+                    </div>
+                `;
+
                 return `
-                    <div class="flex items-center p-4 rounded-xl shadow-md transition duration-150 ${statusClass} border">
-                        <!-- Checkbox -->
-                        <input type="checkbox" ${isCompleted ? 'checked' : ''} 
-                               onclick="toggleComplete('${goal.id}', ${isCompleted})"
-                               class="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 mr-4">
+                    <div class="goal-tile rounded-xl shadow-lg border ${statusClass} overflow-hidden">
                         
-                        <!-- Content -->
-                        <div class="flex-grow">
-                            <p class="text-lg font-medium ${textClass}">${goal.text}</p>
-                            <div class="flex flex-wrap items-center mt-1 text-sm text-gray-500 space-x-3">
-                                <span class="text-sm font-semibold ${isCompleted ? 'text-green-500' : 'text-red-500'}">${dueText}</span>
-                                <div class="space-x-1">${tagBadges}</div>
+                        <div class="flex items-center p-4">
+                            
+                            <input type="checkbox" ${isCompleted ? 'checked' : ''} 
+                                   onclick="toggleComplete('${goal.id}', ${isCompleted})"
+                                   class="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 mr-4 flex-shrink-0">
+                            
+                            <div class="hidden sm:block mr-4 flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
+                                
+
+[Image of ${goal.stepKeyword || 'goal tracking'}]
+
+                            </div>
+
+                            <div class="flex-grow min-w-0">
+                                <p class="text-base sm:text-lg font-medium ${textClass} break-words">${goal.text}</p>
+                                <div class="flex flex-wrap items-center mt-1 text-xs sm:text-sm text-gray-500 space-x-2 sm:space-x-3">
+                                    <span class="font-semibold ${isCompleted ? 'text-green-500' : 'text-red-500'}">${dueText}</span>
+                                    <div class="space-x-1 hidden sm:block">${tagBadges}</div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center ml-2 sm:ml-4 flex-shrink-0 space-x-2">
+                                
+                                <button onclick="toggleSteps('${goal.id}')"
+                                        class="p-2 text-blue-500 rounded-full hover:bg-blue-100 transition duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <svg id="chevron-${goal.id}" class="h-5 w-5 rotate-0 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </button>
+                                
+                                <button onclick="deleteGoal('${goal.id}')"
+                                        class="delete-btn p-2 text-red-500 rounded-full hover:bg-red-100 transition duration-150 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
                             </div>
                         </div>
 
-                        <!-- Delete Button -->
-                        <button onclick="deleteGoal('${goal.id}')"
-                                class="ml-4 p-2 text-red-500 rounded-full hover:bg-red-100 transition duration-150 focus:outline-none focus:ring-2 focus:ring-red-500">
-                            <!-- Trash Icon SVG -->
-                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        </button>
+                        <div id="steps-${goal.id}" class="hidden p-4 pt-0 border-t border-gray-200">
+                            <div class="sm:hidden mb-2 space-x-1">${tagBadges}</div>
+                            ${goalStepsContent}
+                        </div>
                     </div>
                 `;
             }).join('');
             
-            // Re-apply button highlight after rendering
             updateFilterButtons(currentFilter);
         }
 
-        // Initialize with 'All' filter active on load
         window.onload = function() {
             updateFilterButtons('All');
         };
