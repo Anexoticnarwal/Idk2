@@ -35,12 +35,20 @@
 </head>
 <body class="min-h-screen">
 
-    <!-- The header section has been removed entirely -->
-
     <main class="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
 
-        <!-- GOAL CREATION FORM -->
-        <div id="add-goal-container" class="bg-white p-6 rounded-2xl shadow-xl mb-8 border border-gray-100">
+        <!-- YOUR GOALS (MOVED TO TOP) -->
+        <div class="flex justify-between items-center mb-6 border-b pb-2">
+            <h2 class="text-3xl font-bold text-gray-800">Your Goals</h2>
+        </div>
+
+        <!-- GOALS LIST CONTAINER -->
+        <div id="goals-list" class="space-y-6 mb-10">
+            <!-- Goals will be dynamically inserted here -->
+        </div>
+        
+        <!-- GOAL CREATION FORM (MOVED BELOW GOALS) -->
+        <div id="add-goal-container" class="bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
             <div class="flex justify-between items-center mb-4 pb-2 border-b">
                 <h2 class="text-2xl font-bold text-gray-800">New Goal</h2>
                 <button
@@ -77,7 +85,7 @@
                     <!-- Tasks Drafting Section -->
                     <div class="p-4 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
                         <button type="button" id="toggle-tasks-draft" class="w-full text-left flex justify-between items-center text-xl font-bold text-gray-700 hover:text-blue-600 transition duration-150 mb-3" aria-expanded="true">
-                            <span>Initial Tasks (<span id="draft-step-count">0</span>)</span>
+                            <span>Tasks (<span id="draft-step-count">0</span>)</span>
                             <svg class="w-5 h-5 rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </button>
                         
@@ -89,7 +97,7 @@
 
                             <!-- New Step Input Group -->
                             <div class="space-y-3 pt-2 border-t border-gray-200">
-                                <h5 class="text-lg font-semibold text-gray-700">Add Task to Draft</h5>
+                                <h5 class="text-lg font-semibold text-gray-700">Add Task</h5>
                                 
                                 <!-- Task Description Input -->
                                 <div>
@@ -116,32 +124,23 @@
                         </div>
                     </div>
                     
-                    <!-- Notes Section -->
+                    <!-- Notes Section (Simplified) -->
                     <div class="p-4 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
                         <button type="button" id="toggle-notes" class="w-full text-left flex justify-between items-center text-xl font-bold text-gray-700 hover:text-blue-600 transition duration-150 mb-3" aria-expanded="false">
-                            <span>Notes & Context</span>
+                            <span>Notes</span>
                             <svg class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </button>
                         <div id="notes-container" class="details-container">
-                            <textarea id="goal-notes" rows="3" placeholder="Add context, motivation, or key resources for this goal..." class="form-input w-full p-3 border border-gray-300 rounded-xl text-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150"></textarea>
+                            <textarea id="goal-notes" rows="3" placeholder="Context or key resources..." class="form-input w-full p-3 border border-gray-300 rounded-xl text-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150"></textarea>
                         </div>
                     </div>
 
-                    <!-- Submit Button -->
-                    <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-lg py-3 rounded-xl transition duration-200 shadow-lg shadow-purple-300/50 mt-6">
+                    <!-- Submit Button (Emerald) -->
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-lg py-3 rounded-xl transition duration-200 shadow-lg shadow-emerald-300/50 mt-6">
                         CREATE NEW GOAL
                     </button>
                 </form>
             </div>
-        </div>
-
-        <div class="flex justify-between items-center mb-6 border-b pb-2">
-            <h2 class="text-3xl font-bold text-gray-800">Your Goals</h2>
-        </div>
-
-        <!-- GOALS LIST CONTAINER -->
-        <div id="goals-list" class="space-y-6">
-            <!-- Goals will be dynamically inserted here -->
         </div>
 
         <!-- CONFIRMATION MODAL -->
@@ -162,12 +161,11 @@
     </main>
 
     <footer class="max-w-4xl mx-auto px-4 py-4 text-center text-xs text-gray-400 border-t mt-8">
-        <!-- Footer text removed -->
     </footer>
 
     <script>
         // --- DATA MANAGEMENT (LOCAL STORAGE) ---
-        const LOCAL_STORAGE_KEY = 'zenithGoals';
+        const LOCAL_STORAGE_KEY = 'goalTrackerData';
         let goals = [];
         let stepsDraft = [];
 
@@ -184,7 +182,8 @@
          */
         const saveGoals = () => {
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(goals));
-            showStatusMessage('Data saved successfully!');
+            // Logging status directly to console since the UI element was removed
+            console.log('STATUS: Data saved successfully!'); 
             renderGoals();
         };
 
@@ -217,12 +216,11 @@
         };
 
         /**
-         * Shows a temporary status message in the header (now just logging to console).
+         * Shows a temporary status message (now just logging to console).
          * @param {string} message 
          */
         const showStatusMessage = (message) => {
-            // Logging the status instead of updating a UI element that no longer exists
-            console.log(`STATUS: ${message}`);
+            console.warn(`ALERT: ${message}`);
         };
 
         // --- GOAL RENDERING ---
@@ -238,7 +236,7 @@
                 goalsListContainer.innerHTML = `
                     <div class="text-center p-12 bg-white rounded-xl shadow-lg border-4 border-dashed border-gray-300">
                         <p class="text-xl font-semibold text-gray-600">No Goals Found</p>
-                        <p class="mt-2 text-gray-500">Start by creating a new goal above!</p>
+                        <p class="mt-2 text-gray-500">Start by creating a new goal below!</p>
                     </div>
                 `;
                 return;
@@ -262,13 +260,14 @@
             const isGoalCompleted = totalSteps > 0 && completedSteps === totalSteps;
             const isExpanded = goal.isExpanded || false;
 
-            const baseColor = isGoalCompleted ? 'purple' : 'blue';
+            // Use Emerald for success (complete) and Blue for in-progress
+            const baseColor = isGoalCompleted ? 'emerald' : 'blue';
 
             const goalDiv = document.createElement('div');
-            goalDiv.className = `bg-white shadow-xl rounded-2xl p-6 mb-6 border-t-4 border-${baseColor}-500`;
+            goalDiv.className = `bg-white shadow-xl rounded-2xl p-6 border-t-4 border-${baseColor}-500 transition-shadow hover:shadow-2xl`;
             goalDiv.setAttribute('data-goal-id', goal.id);
 
-            // Generate Steps List HTML
+            // Generate Steps List HTML (Only visible in the expanded section)
             const stepsHtml = goal.steps.length > 0
                 ? goal.steps.map(step => {
                     const datesHtml = (step.startDate || step.endDate)
@@ -279,7 +278,7 @@
                     <li data-step-id="${step.id}" class="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 transition duration-100 hover:bg-gray-100">
                         <input type="checkbox" ${step.isCompleted ? 'checked' : ''} 
                             onchange="handleToggleStep('${goal.id}', '${step.id}', this.checked)"
-                            class="toggle-step h-5 w-5 text-green-600 rounded focus:ring-green-500 flex-shrink-0 cursor-pointer mr-3"
+                            class="toggle-step h-5 w-5 text-emerald-600 rounded focus:ring-emerald-500 flex-shrink-0 cursor-pointer mr-3"
                             title="Mark as complete" />
                         <div class="text-sm flex-grow min-w-0 truncate ${step.isCompleted ? 'line-through text-gray-500' : 'text-gray-700'}">
                             <span class="block">${step.description}</span>
@@ -331,23 +330,21 @@
             `;
 
 
-            // Populate the Goal Element
+            // Populate the Goal Element (Simplified Visuals)
             goalDiv.innerHTML = `
-                <!-- Goal Header -->
+                <!-- Goal Header (Simplified Visual View) -->
                 <div class="flex flex-col mb-4">
-                    <div class="flex justify-between items-start">
+                    <div class="flex justify-between items-center mb-3">
                         <h3 class="text-2xl font-bold text-gray-800 ${isGoalCompleted ? 'line-through text-gray-500' : ''}">
                             ${goal.name}
                         </h3>
-                        <span class="text-sm font-semibold px-3 py-1 rounded-full whitespace-nowrap bg-${baseColor}-100 text-${baseColor}-700">
-                            ${progressPercent}% Done
-                        </span>
+                        <!-- Completion Checkmark Icon -->
+                        ${isGoalCompleted ? `
+                            <svg class="w-7 h-7 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" title="Completed"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        ` : ''}
                     </div>
                     
-                    <!-- Dates and Progress Bar -->
-                    <p class="text-sm text-gray-500 mt-1 mb-3">
-                        Start: ${formatDate(goal.startDate)} | Target: ${formatDate(goal.endDate)}
-                    </p>
+                    <!-- Progress Bar Only -->
                     <div class="w-full bg-gray-200 rounded-full h-2">
                         <div
                             class="h-2 rounded-full transition-all duration-500 bg-${baseColor}-500"
@@ -357,26 +354,30 @@
                     </div>
                 </div>
 
-                <hr class="my-3 border-gray-100" />
-                
-                <!-- Steps List -->
-                <h4 class="text-lg font-bold text-gray-700 mb-3">Tasks (${completedSteps}/${totalSteps})</h4>
-                <ul class="space-y-2 mb-4 max-h-60 overflow-y-auto pr-1">
-                    ${stepsHtml}
-                </ul>
-
-                <!-- Expansion Toggle Button -->
+                <!-- Expansion Toggle Button immediately follows progress bar -->
                 <button
                     onclick="handleToggleDetails('${goal.id}')"
                     class="w-full text-sm font-semibold py-2 px-4 rounded-xl transition duration-150 border bg-gray-100 hover:bg-gray-200 text-gray-700 flex justify-center items-center space-x-2"
                 >
-                    <span>${isExpanded ? 'Hide Details' : 'Details & Management'}</span>
+                    <span>${isExpanded ? 'Hide' : 'Manage Goal'}</span>
                     <svg class="w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : 'rotate-0'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                 </button>
 
-                <!-- Expanded Content (Add Step, Notes, Delete) -->
+                <!-- Expanded Content (Now includes Task List and Management) -->
                 <div class="goal-details-content details-container ${isExpanded ? 'expanded' : ''}">
                     
+                    <!-- Dates Summary (Now only visible in expanded view) -->
+                    <p class="text-sm text-gray-600 mb-4 font-medium p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <span class="font-semibold text-gray-700">Timeline:</span> Start: ${formatDate(goal.startDate)} | Target: ${formatDate(goal.endDate)}
+                    </p>
+
+                    <!-- Steps List (Moved inside expanded section) -->
+                    <h4 class="text-lg font-bold text-gray-700 mb-3">Tasks (${completedSteps}/${totalSteps})</h4>
+                    <ul class="space-y-2 mb-4 max-h-60 overflow-y-auto pr-1">
+                        ${stepsHtml}
+                    </ul>
+                    <hr class="my-4 border-gray-200" />
+
                     <!-- 1. Add Step Form -->
                     <div class="mb-4 p-3 bg-white rounded-xl space-y-3 shadow-sm border border-gray-200">
                         <h4 class="text-lg font-semibold text-gray-700">Add Task</h4>
@@ -387,14 +388,14 @@
                                 type="text"
                                 placeholder="e.g., Complete 10 exercises"
                                 id="new-task-desc-${goal.id}"
-                                class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-green-500 focus:border-green-500 transition duration-150"
+                                class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-teal-500 focus:border-teal-500 transition duration-150"
                                 required
                             />
                         </div>
                         <!-- Task Dates Input -->
                         <div class="flex space-x-3">
                             <div class="w-1/2">
-                                <label for="new-task-start-date-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Start Date (Optional)</label>
+                                <label for="new-task-start-date-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                                 <input
                                     type="date"
                                     id="new-task-start-date-${goal.id}"
@@ -403,7 +404,7 @@
                                 />
                             </div>
                             <div class="w-1/2">
-                                <label for="new-task-end-date-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Target Date (Optional)</label>
+                                <label for="new-task-end-date-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Target Date</label>
                                 <input
                                     type="date"
                                     id="new-task-end-date-${goal.id}"
@@ -413,9 +414,10 @@
                             </div>
                         </div>
                         
+                        <!-- Task Add Button (Teal) -->
                         <button
                             onclick="handleAddStep('${goal.id}')"
-                            class="w-full bg-green-600 hover:bg-green-700 text-white font-medium text-sm py-2 rounded-lg transition duration-200 shadow-md mt-3"
+                            class="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm py-2 rounded-lg transition duration-200 shadow-md mt-3"
                         >
                             Add Task
                         </button>
