@@ -3,765 +3,798 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zenith</title>
+    <title>Goal Tracker</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load React and Babel -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Load Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* Custom styles for the app */
+        /* Custom styles */
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
         }
-        /* Ensure the textarea handles wrapping correctly */
-        .whitespace-pre-wrap {
-            white-space: pre-wrap;
+        /* Style for the expandable content sections */
+        .details-container {
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.4s ease-in-out, opacity 0.3s ease-in-out;
+            overflow: hidden; 
+        }
+        .details-container.expanded {
+            max-height: 1500px; /* Large enough value to cover content */
+            opacity: 1;
+            padding-top: 1rem;
+        }
+        /* Custom focus ring for form elements */
+        .form-input:focus {
+            ring: 3px solid #3b82f6;
+            border-color: #3b82f6;
         }
     </style>
 </head>
-<body>
+<body class="min-h-screen">
 
-    <div id="root"></div>
+    <!-- The header section has been removed entirely -->
 
-    <script type="module">
-        // Import Firebase modules using CDN
-        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <main class="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
 
-        // Global variables provided by the Canvas environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // Ensure Firebase log level is set low to avoid excessive console output
-        setLogLevel('error');
-
-        // The collection path structure: /artifacts/{appId}/users/{userId}/{collectionName}
-        const getCollectionPath = (userId) => `/artifacts/${appId}/users/${userId}/goals`;
-
-        // Attach all necessary Firebase imports and constants to the window for the Babel script to use
-        window.firebaseConfig = firebaseConfig;
-        window.initialAuthToken = initialAuthToken;
-        window.firebaseImports = {
-            initializeApp, getApps, getApp, 
-            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
-            getFirestore, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc,
-            getCollectionPath
-        };
-
-    </script>
-
-    <script type="text/babel">
-        // Destructure imports from the globally available firebaseImports
-        const {
-            initializeApp, getApps, getApp, 
-            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
-            getFirestore, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc,
-            getCollectionPath
-        } = window.firebaseImports;
-
-        const firebaseConfig = window.firebaseConfig;
-        const initialAuthToken = window.initialAuthToken;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-
-        const { useState, useEffect, useCallback } = React;
-
-        // --- Firebase Initialization and Auth Hook ---
-
-        function useFirebaseSetup() {
-            const [db, setDb] = useState(null);
-            const [auth, setAuth] = useState(null);
-            const [userId, setUserId] = useState(null);
-            const [isAuthReady, setIsAuthReady] = useState(false);
-
-            useEffect(() => {
-                const setup = async () => {
-                    try {
-                        // 1. Initialize Firebase
-                        if (!getApps().length) {
-                            initializeApp(firebaseConfig);
-                        }
-                        const app = getApp();
-                        const firestore = getFirestore(app);
-                        const authentication = getAuth(app);
-
-                        setDb(firestore);
-                        setAuth(authentication);
-
-                        // 2. Handle Authentication
-                        const unsubscribe = onAuthStateChanged(authentication, async (user) => {
-                            if (!user) {
-                                if (initialAuthToken) {
-                                    await signInWithCustomToken(authentication, initialAuthToken);
-                                } else {
-                                    await signInAnonymously(authentication);
-                                }
-                            }
-
-                            const currentUser = authentication.currentUser;
-                            const currentUserId = currentUser?.uid || crypto.randomUUID();
-                            setUserId(currentUserId);
-                            setIsAuthReady(true);
-                        });
-
-                        return () => unsubscribe();
-
-                    } catch (error) {
-                        console.error("Firebase Setup Error:", error);
-                        setUserId(crypto.randomUUID());
-                        setIsAuthReady(true);
-                    }
-                };
-                setup();
-            }, []);
-
-            return { db, userId, isAuthReady };
-        }
-
-        // --- Data Fetching Hook ---
-
-        function useGoalData(db, userId, isAuthReady) {
-            const [goals, setGoals] = useState([]);
-            const [isLoading, setIsLoading] = useState(true);
-
-            useEffect(() => {
-                if (!isAuthReady || !db || !userId) return;
-
-                const goalsCollectionRef = collection(db, getCollectionPath(userId));
-                const goalsQuery = query(goalsCollectionRef);
-
-                const unsubscribe = onSnapshot(goalsQuery, (snapshot) => {
-                    const fetchedGoals = snapshot.docs.map(doc => {
-                        const data = doc.data();
-                        
-                        // Ensure steps exist and are parsed correctly
-                        const steps = data.steps ? (data.steps.map((step, index) => ({
-                            ...step,
-                            id: step.id || `${doc.id}-${index}`,
-                        }))) : [];
-
-                        return {
-                            id: doc.id,
-                            name: data.name,
-                            startDate: data.startDate || '',
-                            endDate: data.endDate || '',
-                            notes: data.notes || '',
-                            steps: steps,
-                        };
-                    });
-                    setGoals(fetchedGoals);
-                    setIsLoading(false);
-                }, (error) => {
-                    console.error("Error listening to goals:", error);
-                    setIsLoading(false);
-                });
-
-                return () => unsubscribe();
-            }, [db, userId, isAuthReady]);
-
-            return { goals, isLoading };
-        }
-
-        // --- Utility Functions ---
-
-        const formatDate = (dateString) => {
-            if (!dateString) return 'N/A';
-            const [year, month, day] = dateString.split('-');
-            if (year && month && day) {
-                return `${day}/${month}/${year}`;
-            }
-            return dateString;
-        };
-
-        const getCurrentDateString = () => {
-            return new Date().toISOString().slice(0, 10);
-        }
-
-        // --- Goal Management Components ---
-
-        const AddStepForm = ({ db, userId, goalId, currentSteps }) => {
-            const [description, setDescription] = useState('');
-            const [startDate, setStartDate] = useState('');
-            const [endDate, setEndDate] = useState('');
-
-            const handleAddStep = async (e) => {
-                e.preventDefault();
-                if (!description.trim() || !db || !userId) return;
-
-                const newStep = {
-                    id: `${goalId}-${Date.now()}`, 
-                    description: description.trim(),
-                    isCompleted: false,
-                    startDate: startDate,
-                    endDate: endDate,
-                };
-
-                try {
-                    const goalRef = doc(db, getCollectionPath(userId), goalId);
-                    await updateDoc(goalRef, {
-                        steps: [...currentSteps, newStep]
-                    });
-                    setDescription('');
-                    setStartDate('');
-                    setEndDate('');
-                } catch (e) {
-                    console.error("Error adding step: ", e);
-                }
-            };
-
-            return (
-                <form onSubmit={handleAddStep} className="p-3 bg-white rounded-xl space-y-3 shadow-sm border border-gray-200">
-                    <h4 className="text-lg font-semibold text-gray-700">Add Task</h4>
-                    <input
-                        type="text"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="e.g., Complete 10 exercises"
-                        className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-green-500 focus:border-green-500 transition duration-150"
-                        required
-                    />
-                    <div className="flex space-x-2">
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="w-1/2 p-2 border border-gray-300 rounded-lg text-sm"
-                            title="Start Date"
-                        />
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="w-1/2 p-2 border border-gray-300 rounded-lg text-sm"
-                            title="Due Date"
-                        />
+        <!-- GOAL CREATION FORM -->
+        <div id="add-goal-container" class="bg-white p-6 rounded-2xl shadow-xl mb-8 border border-gray-100">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                <h2 class="text-2xl font-bold text-gray-800">New Goal</h2>
+                <button
+                    id="toggle-add-form"
+                    type="button"
+                    class="p-1 text-gray-600 hover:text-blue-600 rounded-full transition duration-150"
+                    aria-label="Toggle Form"
+                >
+                    <svg class="w-6 h-6 rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+            </div>
+            
+            <div id="add-goal-form-content" class="details-container expanded">
+                <form id="add-goal-form" class="space-y-4">
+                    
+                    <!-- Goal Name Input -->
+                    <div>
+                        <label for="goal-name" class="block text-sm font-medium text-gray-700 mb-1">Goal Name</label>
+                        <input id="goal-name" type="text" placeholder="e.g., Launch New Project" class="form-input w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150" required />
                     </div>
-                    <button
-                        type="submit"
-                        className="w-full bg-green-600 hover:bg-green-700 text-white font-medium text-sm py-2 rounded-lg transition duration-200 shadow-md"
-                    >
-                        Add Task
+                    
+                    <!-- Goal Dates Input -->
+                    <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                        <div class="w-full sm:w-1/2">
+                            <label for="goal-start" class="block text-sm font-medium text-gray-700 mb-1">Goal Start Date</label>
+                            <input id="goal-start" type="date" class="form-input w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150" />
+                        </div>
+                        <div class="w-full sm:w-1/2">
+                            <label for="goal-end" class="block text-sm font-medium text-gray-700 mb-1">Overall Target Date</label>
+                            <input id="goal-end" type="date" class="form-input w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150" />
+                        </div>
+                    </div>
+
+                    <!-- Tasks Drafting Section -->
+                    <div class="p-4 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
+                        <button type="button" id="toggle-tasks-draft" class="w-full text-left flex justify-between items-center text-xl font-bold text-gray-700 hover:text-blue-600 transition duration-150 mb-3" aria-expanded="true">
+                            <span>Initial Tasks (<span id="draft-step-count">0</span>)</span>
+                            <svg class="w-5 h-5 rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        
+                        <div id="tasks-draft-container" class="details-container expanded">
+                            <!-- Drafted Steps List -->
+                            <ul id="steps-draft-list" class="space-y-2 mb-4 max-h-40 overflow-y-auto pr-2">
+                                <!-- Steps will be dynamically inserted here -->
+                            </ul>
+
+                            <!-- New Step Input Group -->
+                            <div class="space-y-3 pt-2 border-t border-gray-200">
+                                <h5 class="text-lg font-semibold text-gray-700">Add Task to Draft</h5>
+                                
+                                <!-- Task Description Input -->
+                                <div>
+                                    <label for="new-step-desc" class="block text-sm font-medium text-gray-700 mb-1">Task Description</label>
+                                    <input id="new-step-desc" type="text" placeholder="e.g., Finalize design mockups" class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150" />
+                                </div>
+                                
+                                <!-- Task Dates Input -->
+                                <div class="flex space-x-3">
+                                    <div class="w-1/2">
+                                        <label for="new-step-start-date" class="block text-sm font-medium text-gray-700 mb-1">Start Date (Optional)</label>
+                                        <input id="new-step-start-date" type="date" class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150" />
+                                    </div>
+                                    <div class="w-1/2">
+                                        <label for="new-step-end-date" class="block text-sm font-medium text-gray-700 mb-1">Target Date (Optional)</label>
+                                        <input id="new-step-end-date" type="date" class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150" />
+                                    </div>
+                                </div>
+
+                                <button type="button" id="add-step-draft-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium text-sm py-2 rounded-xl transition duration-200 shadow-md">
+                                    Add Task to Draft
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Notes Section -->
+                    <div class="p-4 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
+                        <button type="button" id="toggle-notes" class="w-full text-left flex justify-between items-center text-xl font-bold text-gray-700 hover:text-blue-600 transition duration-150 mb-3" aria-expanded="false">
+                            <span>Notes & Context</span>
+                            <svg class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div id="notes-container" class="details-container">
+                            <textarea id="goal-notes" rows="3" placeholder="Add context, motivation, or key resources for this goal..." class="form-input w-full p-3 border border-gray-300 rounded-xl text-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-lg py-3 rounded-xl transition duration-200 shadow-lg shadow-purple-300/50 mt-6">
+                        CREATE NEW GOAL
                     </button>
                 </form>
-            );
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center mb-6 border-b pb-2">
+            <h2 class="text-3xl font-bold text-gray-800">Your Goals</h2>
+        </div>
+
+        <!-- GOALS LIST CONTAINER -->
+        <div id="goals-list" class="space-y-6">
+            <!-- Goals will be dynamically inserted here -->
+        </div>
+
+        <!-- CONFIRMATION MODAL -->
+        <div id="confirmation-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4" aria-modal="true" role="dialog">
+            <div id="modal-content" class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6" role="document">
+                <h3 id="modal-title" class="text-xl font-bold text-gray-800 mb-4"></h3>
+                <p id="modal-message" class="text-gray-600 mb-6"></p>
+                <div class="flex justify-end space-x-3">
+                    <button id="modal-cancel-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-150">
+                        Cancel
+                    </button>
+                    <button id="modal-confirm-btn" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition duration-150 shadow-md">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="max-w-4xl mx-auto px-4 py-4 text-center text-xs text-gray-400 border-t mt-8">
+        <!-- Footer text removed -->
+    </footer>
+
+    <script>
+        // --- DATA MANAGEMENT (LOCAL STORAGE) ---
+        const LOCAL_STORAGE_KEY = 'zenithGoals';
+        let goals = [];
+        let stepsDraft = [];
+
+        /**
+         * Loads goals from local storage or initializes an empty array.
+         */
+        const loadGoals = () => {
+            const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+            goals = data ? JSON.parse(data) : [];
         };
 
-        const GoalItem = ({ goal, db, userId }) => {
-            const [isExpanded, setIsExpanded] = useState(false);
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            
-            const [editNotes, setEditNotes] = useState(goal.notes); 
-            const [isEditingNotes, setIsEditingNotes] = useState(false);
+        /**
+         * Saves the current goals array to local storage.
+         */
+        const saveGoals = () => {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(goals));
+            showStatusMessage('Data saved successfully!');
+            renderGoals();
+        };
 
-            useEffect(() => {
-                if (!isEditingNotes) {
-                    setEditNotes(goal.notes);
+        /**
+         * Generates a unique ID (simple UUID v4 replacement).
+         */
+        const generateId = () => {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        };
+
+        /**
+         * Formats a date string to DD/MM/YYYY.
+         * @param {string} dateString - Date in YYYY-MM-DD format.
+         * @returns {string} Formatted date or 'N/A'.
+         */
+        const formatDate = (dateString) => {
+            if (!dateString) return 'N/A';
+            try {
+                const parts = dateString.split('-');
+                if (parts.length === 3) {
+                    return `${parts[2]}/${parts[1]}/${parts[0]}`;
                 }
-            }, [goal.notes, isEditingNotes]);
+                return dateString;
+            } catch {
+                return dateString;
+            }
+        };
 
+        /**
+         * Shows a temporary status message in the header (now just logging to console).
+         * @param {string} message 
+         */
+        const showStatusMessage = (message) => {
+            // Logging the status instead of updating a UI element that no longer exists
+            console.log(`STATUS: ${message}`);
+        };
+
+        // --- GOAL RENDERING ---
+
+        /**
+         * Renders the entire list of goals.
+         */
+        const renderGoals = () => {
+            const goalsListContainer = document.getElementById('goals-list');
+            goalsListContainer.innerHTML = ''; // Clear existing content
+
+            if (goals.length === 0) {
+                goalsListContainer.innerHTML = `
+                    <div class="text-center p-12 bg-white rounded-xl shadow-lg border-4 border-dashed border-gray-300">
+                        <p class="text-xl font-semibold text-gray-600">No Goals Found</p>
+                        <p class="mt-2 text-gray-500">Start by creating a new goal above!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            goals.forEach(goal => {
+                const goalElement = createGoalElement(goal);
+                goalsListContainer.appendChild(goalElement);
+            });
+        };
+
+        /**
+         * Creates the full HTML element for a single goal.
+         * @param {object} goal - The goal object.
+         * @returns {HTMLElement} The goal element.
+         */
+        const createGoalElement = (goal) => {
             const totalSteps = goal.steps.length;
             const completedSteps = goal.steps.filter(s => s.isCompleted).length;
             const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
             const isGoalCompleted = totalSteps > 0 && completedSteps === totalSteps;
+            const isExpanded = goal.isExpanded || false;
 
-            const handleDeleteGoal = async () => {
-                setIsModalOpen(false); 
-                if (!db || !userId) return;
+            const baseColor = isGoalCompleted ? 'purple' : 'blue';
 
-                try {
-                    await deleteDoc(doc(db, getCollectionPath(userId), goal.id));
-                } catch (e) {
-                    console.error("Error deleting goal: ", e);
-                }
-            };
-            
-            const handleSaveNotes = async () => {
-                if (!db || !userId) return;
-                try {
-                    const goalRef = doc(db, getCollectionPath(userId), goal.id);
-                    await updateDoc(goalRef, { notes: editNotes.trim() });
-                    setIsEditingNotes(false);
-                } catch (e) {
-                    console.error("Error saving notes:", e);
-                }
-            };
+            const goalDiv = document.createElement('div');
+            goalDiv.className = `bg-white shadow-xl rounded-2xl p-6 mb-6 border-t-4 border-${baseColor}-500`;
+            goalDiv.setAttribute('data-goal-id', goal.id);
 
-
-            const toggleStepCompletion = useCallback(async (stepId, isCompleted) => {
-                if (!db || !userId) return;
-
-                try {
-                    const goalRef = doc(db, getCollectionPath(userId), goal.id);
-                    const updatedSteps = goal.steps.map(step =>
-                        step.id === stepId ? { ...step, isCompleted: isCompleted } : step
-                    );
-
-                    await updateDoc(goalRef, { steps: updatedSteps });
-                } catch (e) {
-                    console.error("Error toggling step completion: ", e);
-                }
-            }, [db, userId, goal.id, goal.steps]);
-
-            return (
-                <div className={`bg-white shadow-xl rounded-2xl p-6 mb-6 border-t-4 ${isGoalCompleted ? 'border-purple-500' : 'border-blue-500'}`}>
-                    <ConfirmationModal
-                        isOpen={isModalOpen}
-                        title="Delete Goal"
-                        message={`Are you sure you want to delete "${goal.name}"?`}
-                        onConfirm={handleDeleteGoal}
-                        onCancel={() => setIsModalOpen(false)}
-                    />
-
-                    {/* Goal Header */}
-                    <div className="flex flex-col mb-4">
-                        <div className="flex justify-between items-start">
-                            <h3 className={`text-2xl font-bold text-gray-800 ${isGoalCompleted ? 'line-through text-gray-500' : ''}`}>
-                                {goal.name}
-                            </h3>
-                             {/* Completion Badge */}
-                             <span className={`text-sm font-semibold px-3 py-1 rounded-full whitespace-nowrap ${isGoalCompleted ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                {progressPercent}% Done
-                            </span>
-                        </div>
-                       
-                        {/* Dates and Progress Bar */}
-                        <p className="text-sm text-gray-500 mt-1 mb-3">
-                            Start: {formatDate(goal.startDate)} | Target: {formatDate(goal.endDate)}
-                        </p>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                                className={`h-2 rounded-full transition-all duration-500 ${isGoalCompleted ? 'bg-purple-500' : 'bg-blue-500'}`}
-                                style={{ width: `${progressPercent}%` }}
-                                title={`${completedSteps} of ${totalSteps} steps completed`}
-                            ></div>
-                        </div>
-                    </div>
-
-                    <hr className="my-3 border-gray-100" />
+            // Generate Steps List HTML
+            const stepsHtml = goal.steps.length > 0
+                ? goal.steps.map(step => {
+                    const datesHtml = (step.startDate || step.endDate)
+                        ? `<span class="text-xs text-gray-400">Start: ${formatDate(step.startDate)} | Target: ${formatDate(step.endDate)}</span>`
+                        : '';
                     
-                    {/* Steps List */}
-                    <h4 className="text-lg font-bold text-gray-700 mb-3">Tasks ({completedSteps}/{totalSteps})</h4>
-                    <ul className="space-y-2 mb-4 max-h-60 overflow-y-auto pr-1">
-                        {goal.steps.length > 0 ? (
-                            goal.steps.map(step => (
-                                <li key={step.id} className="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 transition duration-100 hover:bg-gray-100">
-                                    <input
-                                        type="checkbox"
-                                        checked={step.isCompleted}
-                                        onChange={(e) => toggleStepCompletion(step.id, e.target.checked)}
-                                        className="h-5 w-5 text-green-600 rounded focus:ring-green-500 flex-shrink-0 cursor-pointer mr-3"
-                                        title="Mark as complete"
-                                    />
-                                    <div className={`text-sm flex-grow min-w-0 truncate ${step.isCompleted ? 'line-through text-gray-500' : 'text-gray-700'}`}>
-                                        <span className='block'>{step.description}</span>
-                                        {step.endDate && <span className='text-xs text-gray-400'>Target: {formatDate(step.endDate)}</span>}
-                                    </div>
-                                </li>
-                            ))
-                        ) : (
-                            <p className="text-center text-gray-500 italic p-2">No tasks yet. Add some below!</p>
-                        )}
-                    </ul>
-
-                    {/* Expansion Toggle Button */}
-                    <button
-                        onClick={() => setIsExpanded(!isExpanded)}
-                        className="w-full text-sm font-semibold py-2 px-4 rounded-xl transition duration-150 border bg-gray-100 hover:bg-gray-200 text-gray-700 flex justify-center items-center space-x-2"
-                    >
-                        <span>{isExpanded ? 'Hide Details' : 'Details & Management'}</span>
-                        <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : 'rotate-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </button>
-
-                    {/* Expanded Content (Add Step, Notes, Delete) */}
-                    <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-screen pt-4' : 'max-h-0'}`}>
-                        
-                        {/* 1. Add Step Form */}
-                        <div className="mb-4">
-                            <AddStepForm db={db} userId={userId} goalId={goal.id} currentSteps={goal.steps} />
+                    return `
+                    <li data-step-id="${step.id}" class="flex items-center p-2 bg-gray-50 rounded-lg border border-gray-200 transition duration-100 hover:bg-gray-100">
+                        <input type="checkbox" ${step.isCompleted ? 'checked' : ''} 
+                            onchange="handleToggleStep('${goal.id}', '${step.id}', this.checked)"
+                            class="toggle-step h-5 w-5 text-green-600 rounded focus:ring-green-500 flex-shrink-0 cursor-pointer mr-3"
+                            title="Mark as complete" />
+                        <div class="text-sm flex-grow min-w-0 truncate ${step.isCompleted ? 'line-through text-gray-500' : 'text-gray-700'}">
+                            <span class="block">${step.description}</span>
+                            ${datesHtml}
                         </div>
-                        
-                        <hr className="my-4 border-gray-200" />
-
-                        {/* 2. Notes Section */}
-                        <div className="bg-blue-50 p-4 rounded-xl mb-4 shadow-inner border border-blue-200">
-                            <h4 className="text-lg font-bold text-blue-800 mb-2 flex justify-between items-center">
-                                Notes
-                                {!isEditingNotes && (
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); setIsEditingNotes(true); }}
-                                        className="text-sm text-blue-600 hover:text-blue-800 transition font-medium"
-                                        title="Edit Notes"
-                                    >
-                                        Edit
-                                    </button>
-                                )}
-                            </h4>
-                            {isEditingNotes ? (
-                                <div>
-                                    <textarea
-                                        value={editNotes}
-                                        onChange={(e) => setEditNotes(e.target.value)}
-                                        rows="4"
-                                        className="w-full p-2 border border-blue-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150"
-                                    />
-                                    <div className="flex justify-end space-x-2 mt-2">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setEditNotes(goal.notes); // Revert changes
-                                                setIsEditingNotes(false);
-                                            }}
-                                            className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleSaveNotes(); }}
-                                            className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
-                                        >
-                                            Save
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <p className="text-gray-700 text-sm whitespace-pre-wrap">
-                                    {goal.notes || 'No notes added.'}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* 3. Delete Button */}
+                    </li>
+                `}).join('')
+                : '<p class="text-center text-gray-500 italic p-2">No tasks yet. Add some below!</p>';
+            
+            // Generate Notes/Editing HTML
+            const notesSectionHtml = `
+                <div class="notes-section bg-${baseColor}-50 p-4 rounded-xl mb-4 shadow-inner border border-${baseColor}-200">
+                    <h4 class="text-lg font-bold text-${baseColor}-800 mb-2 flex justify-between items-center">
+                        Notes
                         <button
-                            onClick={() => setIsModalOpen(true)}
-                            className="mt-4 w-full text-red-600 hover:bg-red-50 text-sm font-semibold py-2 rounded-xl transition duration-150 border border-red-300 shadow-sm"
+                            data-goal-id="${goal.id}"
+                            data-is-editing="false"
+                            onclick="handleEditNotes(this)"
+                            class="edit-notes-btn text-sm text-${baseColor}-600 hover:text-${baseColor}-800 transition font-medium"
+                            title="Edit Notes"
                         >
-                            Delete Goal
+                            Edit
                         </button>
+                    </h4>
+                    <div class="notes-display text-gray-700 text-sm whitespace-pre-wrap">
+                        ${goal.notes || 'No notes added.'}
                     </div>
-                </div>
-            );
-        };
-        
-        const AddGoalForm = ({ db, userId }) => {
-            const [name, setName] = useState('');
-            const [startDate, setStartDate] = useState(getCurrentDateString());
-            const [endDate, setEndDate] = useState('');
-            const [notes, setNotes] = useState('');
-            
-            const [stepsDraft, setStepsDraft] = useState([]); 
-            const [newStepDescription, setNewStepDescription] = useState('');
-            const [newStepEndDate, setNewStepEndDate] = useState(''); // New state for task end date
-            
-            const [isFormExpanded, setIsFormExpanded] = useState(true);
-            const [isNotesExpanded, setIsNotesExpanded] = useState(false);
-            const [isStepsExpanded, setIsStepsExpanded] = useState(true);
-
-            const handleAddStepDraft = (e) => {
-                e.preventDefault(); 
-                if (!newStepDescription.trim()) return;
-
-                const newStep = {
-                    id: `draft-${Date.now()}-${Math.random()}`, 
-                    description: newStepDescription.trim(),
-                    isCompleted: false,
-                    startDate: '', // Start date for draft tasks is left blank initially
-                    endDate: newStepEndDate, 
-                };
-
-                setStepsDraft([...stepsDraft, newStep]);
-                setNewStepDescription('');
-                setNewStepEndDate(''); // Reset date input
-            };
-
-            const handleRemoveStepDraft = (idToRemove) => {
-                setStepsDraft(stepsDraft.filter(step => step.id !== idToRemove));
-            };
-
-
-            const handleAddGoal = async (e) => {
-                e.preventDefault();
-                if (!name.trim() || !db || !userId) return;
-
-                try {
-                    await addDoc(collection(db, getCollectionPath(userId)), {
-                        name: name.trim(),
-                        startDate: startDate,
-                        endDate: endDate,
-                        notes: notes.trim(),
-                        steps: stepsDraft, 
-                        createdAt: new Date(),
-                    });
-                    
-                    // Reset all form fields
-                    setName('');
-                    setStartDate(getCurrentDateString());
-                    setEndDate('');
-                    setNotes('');
-                    setStepsDraft([]);
-                    setNewStepDescription('');
-                    setNewStepEndDate('');
-                    setIsFormExpanded(false); 
-                    setIsNotesExpanded(false); 
-                    setIsStepsExpanded(true); 
-                } catch (e) {
-                    console.error("Error adding document: ", e);
-                }
-            };
-
-            return (
-                <div className="bg-white p-6 rounded-2xl shadow-xl mb-8 border border-gray-100">
-                    <div className="flex justify-between items-center mb-4 pb-2 border-b">
-                        <h2 className="text-2xl font-bold text-gray-800">New Goal</h2>
-                        <button
-                            onClick={() => setIsFormExpanded(!isFormExpanded)}
-                            type="button"
-                            className="p-1 text-gray-600 hover:text-blue-600 rounded-full transition duration-150"
-                            aria-label={isFormExpanded ? "Collapse Form" : "Expand Form"}
-                        >
-                            <svg className={`w-6 h-6 transition-transform ${isFormExpanded ? 'rotate-180' : 'rotate-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </button>
-                    </div>
-                    
-                    {/* Collapsible Form Content */}
-                    <div className={`overflow-hidden transition-all duration-300 ${isFormExpanded ? 'max-h-[1500px]' : 'max-h-0'}`}>
-                        <form onSubmit={handleAddGoal} className="space-y-4">
-                            
-                            {/* Goal Name Input */}
-                            <div>
-                                <label htmlFor="goal-name" className="block text-sm font-medium text-gray-700 mb-1">Goal Name</label>
-                                <input
-                                    id="goal-name"
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    placeholder="e.g., Launch New Project"
-                                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150"
-                                    required
-                                />
-                            </div>
-                            
-                            {/* Dates Input */}
-                            <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-                                <div className="w-full sm:w-1/2">
-                                    <label htmlFor="goal-start" className="block text-sm font-medium text-gray-700 mb-1">Goal Start Date</label>
-                                    <input
-                                        id="goal-start"
-                                        type="date"
-                                        value={startDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
-                                        className="w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150"
-                                    />
-                                </div>
-                                <div className="w-full sm:w-1/2">
-                                    <label htmlFor="goal-end" className="block text-sm font-medium text-gray-700 mb-1">Overall Target Date</label>
-                                    <input
-                                        id="goal-end"
-                                        type="date"
-                                        value={endDate}
-                                        onChange={(e) => setEndDate(e.target.value)}
-                                        className="w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Steps Drafting Section - COLLAPSIBLE */}
-                            <div className="p-4 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsStepsExpanded(!isStepsExpanded)}
-                                    className="w-full text-left flex justify-between items-center text-xl font-bold text-gray-700 hover:text-blue-600 transition duration-150 mb-3"
-                                >
-                                    <span>Initial Tasks ({stepsDraft.length})</span>
-                                    <svg className={`w-5 h-5 transition-transform ${isStepsExpanded ? 'rotate-180' : 'rotate-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                                </button>
-                                
-                                <div className={`overflow-hidden transition-all duration-300 ${isStepsExpanded ? 'max-h-96' : 'max-h-0'}`}>
-                                    {/* Drafted Steps List */}
-                                    {stepsDraft.length > 0 && (
-                                        <ul className="space-y-2 mb-4 max-h-40 overflow-y-auto pr-2">
-                                            {stepsDraft.map((step, index) => (
-                                                <li key={step.id} className="flex justify-between items-center text-sm p-2 bg-white rounded-lg border border-gray-100 shadow-sm">
-                                                    <div className="flex-grow min-w-0">
-                                                        <span className="text-gray-700 block truncate">{index + 1}. {step.description}</span>
-                                                        {step.endDate && <span className="text-gray-500 text-xs">Target: {formatDate(step.endDate)}</span>}
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemoveStepDraft(step.id)}
-                                                        className="text-red-500 hover:text-red-700 p-1 rounded-full transition flex-shrink-0"
-                                                        title="Remove Task"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                                    </button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-
-                                    {/* New Step Input Group */}
-                                    <div className="space-y-2">
-                                        <label className="block text-sm font-medium text-gray-700">New Task Details</label>
-                                        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                                            <input
-                                                type="text"
-                                                value={newStepDescription}
-                                                onChange={(e) => setNewStepDescription(e.target.value)}
-                                                placeholder="Task Description"
-                                                className="flex-grow p-2 border border-gray-300 rounded-lg text-sm focus:ring-green-500 focus:border-green-500 transition duration-150"
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        e.preventDefault();
-                                                        handleAddStepDraft(e);
-                                                    }
-                                                }}
-                                            />
-                                            <input
-                                                type="date"
-                                                value={newStepEndDate}
-                                                onChange={(e) => setNewStepEndDate(e.target.value)}
-                                                className="sm:w-1/3 p-2 border border-gray-300 rounded-lg text-sm"
-                                                title="Task Due Date (Optional)"
-                                            />
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleAddStepDraft}
-                                            className="w-full bg-green-600 hover:bg-green-700 text-white font-medium text-sm px-4 py-2 rounded-lg transition duration-200 shadow-md"
-                                            title="Click to add task"
-                                        >
-                                            Add Task to Goal
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* Goal Notes Input - Collapsible */}
-                            <div className="border-t pt-4 border-gray-200">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsNotesExpanded(!isNotesExpanded)}
-                                    className="w-full text-left flex justify-between items-center text-md font-bold text-gray-700 hover:text-blue-600 transition duration-150"
-                                >
-                                    <span>Notes (Optional)</span>
-                                    <svg className={`w-5 h-5 transition-transform ${isNotesExpanded ? 'rotate-180' : 'rotate-0'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                                </button>
-                                
-                                <div className={`overflow-hidden transition-all duration-300 ${isNotesExpanded ? 'max-h-60 mt-3' : 'max-h-0'}`}>
-                                    <textarea
-                                        id="goal-notes"
-                                        value={notes}
-                                        onChange={(e) => setNotes(e.target.value)}
-                                        placeholder="Add motivation, strategy, or long-form notes here."
-                                        rows="3"
-                                        className="w-full p-3 border border-gray-300 rounded-xl focus:ring-blue-500 focus:border-blue-500 transition duration-150"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Submit Button */}
+                    <div class="notes-edit hidden mt-2">
+                        <textarea
+                            rows="4"
+                            class="notes-textarea w-full p-2 border border-${baseColor}-300 rounded-lg text-sm focus:ring-${baseColor}-500 focus:border-${baseColor}-500 transition duration-150"
+                        >${goal.notes || ''}</textarea>
+                        <div class="flex justify-end space-x-2 mt-2">
                             <button
-                                type="submit"
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md transition duration-200 transform hover:scale-[1.01] mt-6"
-                            >
-                                Start Goal
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            );
-        };
-
-
-        // Custom Modal Component (to replace window.confirm/alert)
-        const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel, title }) => {
-            if (!isOpen) return null;
-
-            return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={onCancel}>
-                    <div className="bg-white rounded-xl shadow-2xl p-6 w-11/12 max-w-sm" onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold text-red-600 mb-3">{title}</h3>
-                        <p className="text-gray-700 mb-6">{message}</p>
-                        <div className="flex justify-end space-x-3">
-                            <button
-                                onClick={onCancel}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+                                onclick="handleCancelNotes('${goal.id}', this)"
+                                class="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
                             >
                                 Cancel
                             </button>
                             <button
-                                onClick={onConfirm}
-                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition"
+                                onclick="handleSaveNotes('${goal.id}', this.closest('.notes-section').querySelector('.notes-textarea').value)"
+                                class="px-3 py-1 text-sm font-medium text-white bg-${baseColor}-600 rounded-lg hover:bg-${baseColor}-700 transition"
                             >
-                                Delete
+                                Save
                             </button>
                         </div>
                     </div>
                 </div>
-            );
-        };
+            `;
 
 
-        // --- Main Application Component ---
-
-        const App = () => {
-            const { db, userId, isAuthReady } = useFirebaseSetup();
-            const { goals, isLoading } = useGoalData(db, userId, isAuthReady);
-
-            if (!isAuthReady) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-                        <div className="text-center text-gray-600">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3"></div>
-                            Loading...
-                        </div>
+            // Populate the Goal Element
+            goalDiv.innerHTML = `
+                <!-- Goal Header -->
+                <div class="flex flex-col mb-4">
+                    <div class="flex justify-between items-start">
+                        <h3 class="text-2xl font-bold text-gray-800 ${isGoalCompleted ? 'line-through text-gray-500' : ''}">
+                            ${goal.name}
+                        </h3>
+                        <span class="text-sm font-semibold px-3 py-1 rounded-full whitespace-nowrap bg-${baseColor}-100 text-${baseColor}-700">
+                            ${progressPercent}% Done
+                        </span>
                     </div>
-                );
-            }
-
-            return (
-                <div className="min-h-screen bg-gray-50 font-sans p-4 sm:p-6">
-                    <div className="max-w-xl mx-auto">
-                        <header className="py-6 mb-8 text-center">
-                            <h1 className="text-4xl font-extrabold text-blue-700 mb-1">Zenith</h1>
-                            {userId && (
-                                <p className="text-xs text-gray-400 mt-2 p-1 bg-gray-100 rounded-lg inline-block">
-                                    User ID: {userId}
-                                </p>
-                            )}
-                        </header>
-
-                        {/* Goal List (Now at the top) */}
-                        <h2 className="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">My Goals</h2>
-                        {isLoading ? (
-                            <div className="text-center text-gray-500 p-8">Loading goals...</div>
-                        ) : goals.length === 0 ? (
-                            <div className="text-center bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 rounded-lg mb-8">
-                                <p className="font-semibold">You have no active goals.</p>
-                                <p className="text-sm">Add them below.</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {goals.map(goal => (
-                                    <GoalItem key={goal.id} goal={goal} db={db} userId={userId} />
-                                ))}
-                            </div>
-                        )}
-                        
-                        {/* Add Goal Form (Now at the bottom, and collapsible) */}
-                        {db && userId ? <AddGoalForm db={db} userId={userId} /> : <div className="text-center text-red-500 mb-8">Database not ready.</div>}
+                    
+                    <!-- Dates and Progress Bar -->
+                    <p class="text-sm text-gray-500 mt-1 mb-3">
+                        Start: ${formatDate(goal.startDate)} | Target: ${formatDate(goal.endDate)}
+                    </p>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                            class="h-2 rounded-full transition-all duration-500 bg-${baseColor}-500"
+                            style="width: ${progressPercent}%"
+                            title="${completedSteps} of ${totalSteps} steps completed"
+                        ></div>
                     </div>
                 </div>
-            );
+
+                <hr class="my-3 border-gray-100" />
+                
+                <!-- Steps List -->
+                <h4 class="text-lg font-bold text-gray-700 mb-3">Tasks (${completedSteps}/${totalSteps})</h4>
+                <ul class="space-y-2 mb-4 max-h-60 overflow-y-auto pr-1">
+                    ${stepsHtml}
+                </ul>
+
+                <!-- Expansion Toggle Button -->
+                <button
+                    onclick="handleToggleDetails('${goal.id}')"
+                    class="w-full text-sm font-semibold py-2 px-4 rounded-xl transition duration-150 border bg-gray-100 hover:bg-gray-200 text-gray-700 flex justify-center items-center space-x-2"
+                >
+                    <span>${isExpanded ? 'Hide Details' : 'Details & Management'}</span>
+                    <svg class="w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : 'rotate-0'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+
+                <!-- Expanded Content (Add Step, Notes, Delete) -->
+                <div class="goal-details-content details-container ${isExpanded ? 'expanded' : ''}">
+                    
+                    <!-- 1. Add Step Form -->
+                    <div class="mb-4 p-3 bg-white rounded-xl space-y-3 shadow-sm border border-gray-200">
+                        <h4 class="text-lg font-semibold text-gray-700">Add Task</h4>
+                        <!-- Task Description Input -->
+                        <div>
+                            <label for="new-task-desc-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Task Description</label>
+                            <input
+                                type="text"
+                                placeholder="e.g., Complete 10 exercises"
+                                id="new-task-desc-${goal.id}"
+                                class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-green-500 focus:border-green-500 transition duration-150"
+                                required
+                            />
+                        </div>
+                        <!-- Task Dates Input -->
+                        <div class="flex space-x-3">
+                            <div class="w-1/2">
+                                <label for="new-task-start-date-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Start Date (Optional)</label>
+                                <input
+                                    type="date"
+                                    id="new-task-start-date-${goal.id}"
+                                    class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                    title="Task Start Date"
+                                />
+                            </div>
+                            <div class="w-1/2">
+                                <label for="new-task-end-date-${goal.id}" class="block text-sm font-medium text-gray-700 mb-1">Target Date (Optional)</label>
+                                <input
+                                    type="date"
+                                    id="new-task-end-date-${goal.id}"
+                                    class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                    title="Task Due Date"
+                                />
+                            </div>
+                        </div>
+                        
+                        <button
+                            onclick="handleAddStep('${goal.id}')"
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-medium text-sm py-2 rounded-lg transition duration-200 shadow-md mt-3"
+                        >
+                            Add Task
+                        </button>
+                    </div>
+                    
+                    <hr class="my-4 border-gray-200" />
+
+                    <!-- 2. Notes Section -->
+                    ${notesSectionHtml}
+
+                    <!-- 3. Delete Button -->
+                    <button
+                        onclick="showDeleteModal('${goal.id}', '${goal.name}')"
+                        class="mt-4 w-full text-red-600 hover:bg-red-50 text-sm font-semibold py-2 rounded-xl transition duration-150 border border-red-300 shadow-sm"
+                    >
+                        Delete Goal
+                    </button>
+                </div>
+            `;
+            return goalDiv;
         };
 
-        // --- Execute React Rendering ---
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        // --- HANDLERS (GOAL ACTIONS) ---
 
+        /**
+         * Toggles the expanded state of a goal's detail section.
+         * @param {string} goalId 
+         */
+        const handleToggleDetails = (goalId) => {
+            const goal = goals.find(g => g.id === goalId);
+            if (!goal) return;
+
+            goal.isExpanded = !goal.isExpanded;
+            // No need to save to localStorage as expansion state is temporary
+            renderGoals(); 
+        };
+
+        /**
+         * Toggles the completion status of a step.
+         * @param {string} goalId 
+         * @param {string} stepId 
+         * @param {boolean} isCompleted 
+         */
+        const handleToggleStep = (goalId, stepId, isCompleted) => {
+            const goal = goals.find(g => g.id === goalId);
+            if (!goal) return;
+
+            const step = goal.steps.find(s => s.id === stepId);
+            if (step) {
+                step.isCompleted = isCompleted;
+                saveGoals();
+            }
+        };
+
+        /**
+         * Adds a new task/step to an existing goal.
+         * @param {string} goalId 
+         */
+        const handleAddStep = (goalId) => {
+            const goal = goals.find(g => g.id === goalId);
+            if (!goal) return;
+
+            // Retrieve the new input elements using their IDs
+            const descInput = document.getElementById(`new-task-desc-${goalId}`);
+            const startInput = document.getElementById(`new-task-start-date-${goalId}`);
+            const endInput = document.getElementById(`new-task-end-date-${goalId}`);
+            
+            const description = descInput.value.trim();
+            const startDate = startInput.value;
+            const endDate = endInput.value;
+
+            if (!description) {
+                showStatusMessage('Task description is required!');
+                return;
+            }
+
+            const newStep = {
+                id: generateId(),
+                description: description,
+                isCompleted: false,
+                startDate: startDate, 
+                endDate: endDate, 
+            };
+
+            goal.steps.push(newStep);
+            saveGoals();
+
+            // Clear inputs
+            descInput.value = '';
+            startInput.value = '';
+            endInput.value = '';
+        };
+
+        /**
+         * Toggles the edit mode for goal notes.
+         * @param {HTMLElement} button - The button element that was clicked.
+         */
+        const handleEditNotes = (button) => {
+            const goalDiv = button.closest('[data-goal-id]');
+            const goalId = goalDiv.getAttribute('data-goal-id');
+            const isEditing = button.getAttribute('data-is-editing') === 'true';
+            
+            const notesDisplay = goalDiv.querySelector('.notes-display');
+            const notesEdit = goalDiv.querySelector('.notes-edit');
+            const notesTextarea = goalDiv.querySelector('.notes-textarea');
+
+            if (isEditing) {
+                // Exit edit mode (should usually be handled by save/cancel)
+                notesDisplay.classList.remove('hidden');
+                notesEdit.classList.add('hidden');
+                button.textContent = 'Edit';
+                button.setAttribute('data-is-editing', 'false');
+            } else {
+                // Enter edit mode
+                const goal = goals.find(g => g.id === goalId);
+                if (goal) {
+                    notesTextarea.value = goal.notes || '';
+                    notesDisplay.classList.add('hidden');
+                    notesEdit.classList.remove('hidden');
+                    button.textContent = 'Editing...';
+                    button.setAttribute('data-is-editing', 'true');
+                }
+            }
+        };
+        
+        /**
+         * Saves the updated goal notes.
+         * @param {string} goalId 
+         * @param {string} newNotes 
+         */
+        const handleSaveNotes = (goalId, newNotes) => {
+            const goal = goals.find(g => g.id === goalId);
+            if (!goal) return;
+
+            goal.notes = newNotes.trim();
+            saveGoals();
+
+            // Exit edit mode manually after saving
+            const goalDiv = document.querySelector(`[data-goal-id="${goalId}"]`);
+            const button = goalDiv.querySelector('.edit-notes-btn');
+            handleEditNotes(button);
+        };
+
+        /**
+         * Cancels note editing and reverts to display mode.
+         * @param {string} goalId 
+         * @param {HTMLElement} button 
+         */
+        const handleCancelNotes = (goalId, button) => {
+             const goalDiv = document.querySelector(`[data-goal-id="${goalId}"]`);
+             const editButton = goalDiv.querySelector('.edit-notes-btn');
+             handleEditNotes(editButton); // Call edit handler to toggle back
+        }
+
+        /**
+         * Deletes a goal after confirmation.
+         * @param {string} goalId 
+         */
+        const deleteGoal = (goalId) => {
+            goals = goals.filter(g => g.id !== goalId);
+            saveGoals();
+            hideModal();
+        };
+
+        // --- CONFIRMATION MODAL LOGIC ---
+        const modal = document.getElementById('confirmation-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn');
+
+        let pendingDeleteId = null;
+
+        /**
+         * Shows the custom delete confirmation modal.
+         * @param {string} goalId 
+         * @param {string} goalName 
+         */
+        const showDeleteModal = (goalId, goalName) => {
+            pendingDeleteId = goalId;
+            modalTitle.textContent = 'Delete Goal';
+            modalMessage.textContent = `Are you sure you want to delete "${goalName}"? This action cannot be undone and will permanently delete the data from your browser.`;
+            modalConfirmBtn.textContent = 'Confirm Delete';
+            modal.classList.remove('hidden');
+            modal.onclick = hideModal; // Close if clicked outside
+        };
+
+        /**
+         * Hides the custom modal.
+         */
+        const hideModal = () => {
+            modal.classList.add('hidden');
+            pendingDeleteId = null;
+        };
+        
+        // Attach modal event listeners
+        modalConfirmBtn.onclick = () => {
+            if (pendingDeleteId) {
+                deleteGoal(pendingDeleteId);
+            }
+        };
+        modalCancelBtn.onclick = hideModal;
+
+        // Prevent modal from closing when clicking inside the content box
+        document.getElementById('modal-content').onclick = (e) => e.stopPropagation();
+
+        // --- GOAL CREATION DRAFTING ---
+
+        /**
+         * Renders the draft steps list.
+         */
+        const renderStepsDraft = () => {
+            const list = document.getElementById('steps-draft-list');
+            const countSpan = document.getElementById('draft-step-count');
+            list.innerHTML = '';
+            countSpan.textContent = stepsDraft.length;
+
+            if (stepsDraft.length === 0) {
+                list.innerHTML = '<p class="text-center text-gray-500 italic p-2">No tasks added to draft.</p>';
+                return;
+            }
+
+            stepsDraft.forEach((step, index) => {
+                const datesHtml = (step.startDate || step.endDate)
+                    ? `<span class="text-gray-500 text-xs">Start: ${formatDate(step.startDate)} | Target: ${formatDate(step.endDate)}</span>`
+                    : '';
+
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center text-sm p-2 bg-white rounded-lg border border-gray-100 shadow-sm';
+                li.innerHTML = `
+                    <div class="flex-grow min-w-0">
+                        <span class="text-gray-700 block truncate">${index + 1}. ${step.description}</span>
+                        ${datesHtml}
+                    </div>
+                    <button
+                        type="button"
+                        onclick="handleRemoveStepDraft('${step.id}')"
+                        class="text-red-500 hover:text-red-700 p-1 rounded-full transition flex-shrink-0"
+                        title="Remove Task"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                `;
+                list.appendChild(li);
+            });
+        };
+
+        /**
+         * Adds a step to the draft list.
+         */
+        const handleAddStepDraft = () => {
+            const descInput = document.getElementById('new-step-desc');
+            const startInput = document.getElementById('new-step-start-date');
+            const endInput = document.getElementById('new-step-end-date');
+            
+            const description = descInput.value.trim();
+            const startDate = startInput.value;
+            const endDate = endInput.value;
+
+            if (!description) {
+                showStatusMessage('Task description is required for draft!');
+                return;
+            }
+
+            const newStep = {
+                id: generateId(),
+                description: description,
+                isCompleted: false,
+                startDate: startDate,
+                endDate: endDate,
+            };
+
+            stepsDraft.push(newStep);
+            renderStepsDraft();
+
+            // Clear inputs
+            descInput.value = '';
+            startInput.value = '';
+            endInput.value = '';
+        };
+
+        /**
+         * Removes a step from the draft list.
+         * @param {string} idToRemove 
+         */
+        const handleRemoveStepDraft = (idToRemove) => {
+            stepsDraft = stepsDraft.filter(step => step.id !== idToRemove);
+            renderStepsDraft();
+        };
+
+        // --- FORM SUBMISSION ---
+        
+        /**
+         * Handles the final creation of a new goal.
+         * @param {Event} e 
+         */
+        const handleAddGoal = (e) => {
+            e.preventDefault();
+
+            const nameInput = document.getElementById('goal-name');
+            const startInput = document.getElementById('goal-start');
+            const endInput = document.getElementById('goal-end');
+            const notesInput = document.getElementById('goal-notes');
+
+            const name = nameInput.value.trim();
+            const startDate = startInput.value;
+            const endDate = endInput.value;
+            const notes = notesInput.value.trim();
+
+            if (!name) {
+                showStatusMessage('Goal name cannot be empty!');
+                return;
+            }
+
+            const newGoal = {
+                id: generateId(),
+                name: name,
+                startDate: startDate,
+                endDate: endDate,
+                notes: notes,
+                steps: [...stepsDraft], // Clone draft steps into the new goal
+                createdAt: new Date().toISOString(),
+                isExpanded: true // Expand details upon creation
+            };
+
+            goals.push(newGoal);
+            saveGoals();
+
+            // Reset form and draft
+            nameInput.value = '';
+            startInput.value = new Date().toISOString().slice(0, 10);
+            endInput.value = '';
+            notesInput.value = '';
+            stepsDraft = [];
+            renderStepsDraft();
+
+            // Collapse the form
+            const formContent = document.getElementById('add-goal-form-content');
+            const toggleFormBtn = document.getElementById('toggle-add-form');
+            if(formContent.classList.contains('expanded')) {
+                formContent.classList.remove('expanded');
+                toggleFormBtn.querySelector('svg').classList.remove('rotate-180');
+            }
+        };
+
+        // --- INITIALIZATION AND EVENT LISTENERS ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadGoals();
+            renderGoals();
+            renderStepsDraft();
+
+            // Set default start date for the main goal form
+            document.getElementById('goal-start').value = new Date().toISOString().slice(0, 10);
+
+            // Add form listeners
+            document.getElementById('add-goal-form').addEventListener('submit', handleAddGoal);
+            document.getElementById('add-step-draft-btn').addEventListener('click', handleAddStepDraft);
+
+            // Add form toggle listeners
+            const setupToggle = (buttonId, contentId) => {
+                const button = document.getElementById(buttonId);
+                const content = document.getElementById(contentId);
+                const svg = button.querySelector('svg');
+                
+                button.addEventListener('click', () => {
+                    content.classList.toggle('expanded');
+                    svg.classList.toggle('rotate-180');
+                    button.setAttribute('aria-expanded', content.classList.contains('expanded'));
+                });
+            };
+
+            setupToggle('toggle-add-form', 'add-goal-form-content');
+            setupToggle('toggle-tasks-draft', 'tasks-draft-container');
+            setupToggle('toggle-notes', 'notes-container');
+            
+            // Fix initial state for default expanded elements
+            document.getElementById('toggle-tasks-draft').setAttribute('aria-expanded', 'true');
+        });
     </script>
 </body>
 </html>
