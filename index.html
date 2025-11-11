@@ -3,773 +3,456 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personal Goal Dashboard (Firestore Edition)</title>
+    <title>Advanced Goal Tracker</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Load Inter font -->
     <style>
-        /* Custom styles for appearance */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f7f9fc;
-        }
-        .progress-bar {
-            transition: width 0.3s ease-in-out;
-        }
-        .goal-card {
-            transition: all 0.2s ease-in-out;
-        }
-        .goal-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
-        }
-        /* Custom scrollbar for better visual on dark panels */
-        .subtask-list::-webkit-scrollbar {
-            width: 8px;
-        }
-        .subtask-list::-webkit-scrollbar-thumb {
-            background-color: #9ca3af;
-            border-radius: 4px;
-        }
-        .subtask-list::-webkit-scrollbar-track {
-            background-color: #1f2937;
-        }
-        .confetti-celebration {
-            position: relative;
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-        }
-        .save-indicator {
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        .save-indicator.visible {
-            opacity: 1;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
     </style>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
 </head>
-<body class="min-h-screen">
+<body class="bg-gray-50 min-h-screen p-4 sm:p-8">
 
-    <!-- Main Container -->
-    <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        <header class="mb-8">
-            <h1 class="text-4xl font-extrabold text-gray-900 mb-2 flex items-center">
-                <i data-lucide="sparkles" class="w-8 h-8 mr-3 text-indigo-600"></i>
-                Momentum Dashboard
-            </h1>
-            <p class="text-gray-600">Set clear goals, track actionable steps, and log your progress. (Data saved to Firestore)</p>
-            <p id="user-id-display" class="text-xs text-gray-400 mt-1">Status: Connecting...</p>
+    <div id="app" class="max-w-4xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-blue-700">Timeline Goal Tracker</h1>
+            <p class="text-gray-500 mt-2">Set deadlines, add tags, and visualize your progress by time periods.</p>
+            <div id="auth-status" class="text-sm text-gray-400 mt-2">Loading authentication...</div>
         </header>
 
-        <!-- Goal Creation Section -->
-        <section class="mb-10 bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Add a New Mission</h2>
-            <form id="goal-form" class="space-y-4">
-                <div>
-                    <label for="goal-title" class="block text-sm font-medium text-gray-700">Goal Title</label>
-                    <input type="text" id="goal-title" required placeholder="e.g., Launch New Side Project in 90 Days" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 border">
-                </div>
-                <div>
-                    <label for="goal-tasks" class="block text-sm font-medium text-gray-700 flex justify-between items-center">
-                        Actionable Steps (One per line)
-                    </label>
-                    <textarea id="goal-tasks" required rows="4" placeholder="e.g.,&#10;Define product scope&#10;Build basic authentication&#10;Complete marketing landing page" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 border"></textarea>
-                    <p class="text-xs text-gray-500 mt-1">These are the sub-tasks that determine your goal's progress.</p>
-                </div>
-                <button type="submit" id="add-goal-btn" class="w-full sm:w-auto flex items-center justify-center rounded-lg bg-indigo-600 px-6 py-3 text-base font-medium text-white shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-150 ease-in-out">
-                    <i data-lucide="rocket" class="w-5 h-5 mr-2"></i>
-                    Initiate Goal
-                </button>
-            </form>
-        </section>
-
-        <!-- Goal Dashboard -->
-        <section>
-            <h2 class="text-2xl font-semibold text-gray-800 mb-6">Active Goals</h2>
-            <div id="goals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Goals will be rendered here by JavaScript -->
-                <p id="empty-state" class="text-gray-500 italic col-span-full">Loading goals...</p>
-            </div>
-        </section>
-
-    </div>
-
-    <!-- Edit/Progress Modal -->
-    <div id="edit-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden transition-opacity duration-300 items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all sm:max-w-xl">
-            <!-- Modal Header -->
-            <div class="bg-gray-800 p-6 text-white flex justify-between items-center">
-                <h3 id="modal-title" class="text-xl font-bold truncate">Goal Details</h3>
-                <button onclick="closeEditModal()" class="text-gray-400 hover:text-white transition duration-150">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M18 6L6 18"/><path d="M6 6L18 18"/></svg>
-                </button>
-            </div>
-
-            <!-- Modal Body: Tabs (Steps vs Notes) -->
-            <div class="p-6">
+        <!-- Goal Input Form -->
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8 border border-gray-100">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Set a New Goal</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input id="new-goal-text" type="text" placeholder="Goal Description (e.g., Finish Q4 report)"
+                       class="col-span-3 md:col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                 
-                <div class="mb-6">
-                    <h4 class="text-lg font-medium text-gray-700 mb-2">Progress Overview</h4>
-                    <div class="w-full bg-gray-200 rounded-full h-3">
-                        <div id="modal-progress-bar" class="progress-bar h-3 rounded-full bg-indigo-500" style="width: 0%"></div>
-                    </div>
-                    <p id="modal-progress-text" class="text-sm font-semibold text-gray-600 mt-2">0% Complete</p>
-                </div>
+                <input id="new-goal-due-date" type="date" title="Due Date"
+                       class="col-span-3 md:col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
 
-                <!-- Tab Navigation -->
-                <div class="flex border-b border-gray-200 mb-4">
-                    <button id="tab-steps" onclick="showTab('steps')" class="py-2 px-4 text-sm font-medium border-b-2 border-indigo-500 text-indigo-600 transition duration-150">Actionable Steps</button>
-                    <button id="tab-notes" onclick="showTab('notes')" class="py-2 px-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition duration-150">Notes & Reflection</button>
-                </div>
+                <input id="new-goal-tags" type="text" placeholder="Tags (comma-separated: work, health)"
+                       class="col-span-3 md:col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <button onclick="addGoal()"
+                    class="mt-4 w-full md:w-auto px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition duration-150 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                Add Goal
+            </button>
+        </div>
 
-                <!-- Tab Content: Steps -->
-                <div id="content-steps">
-                    <h4 class="text-lg font-medium text-gray-700 mb-3">Steps to Completion</h4>
-                    <div id="modal-subtasks-container" class="space-y-3 max-h-64 overflow-y-auto subtask-list p-2 rounded-lg bg-gray-50 border border-gray-200">
-                        <!-- Subtasks will be loaded here -->
-                    </div>
-                </div>
-
-                <!-- Tab Content: Notes (Updated for auto-save) -->
-                <div id="content-notes" class="hidden">
-                    <div class="flex justify-between items-center mb-3">
-                        <h4 class="text-lg font-medium text-gray-700">Goal Notes (Max 500 chars)</h4>
-                        <!-- New Auto-Save Indicator -->
-                        <span id="save-indicator" class="text-xs font-semibold text-green-600 save-indicator flex items-center">
-                            <i data-lucide="check" class="w-4 h-4 mr-1"></i>
-                            Saved!
-                        </span>
-                    </div>
-                    <textarea id="modal-notes" rows="6" maxlength="500" placeholder="Jot down insights, obstacles encountered, or next steps here." 
-                                 oninput="handleNoteInput(event)"
-                                 class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 border text-sm"></textarea>
-                    <p class="text-xs text-gray-500 mt-2">Notes auto-save to Firestore as you type.</p>
-                </div>
+        <!-- Filter and Visualization Controls -->
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8 border border-gray-100">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Visualize Goals</h2>
+            
+            <!-- Timeframe Filters - This div is the container we check against in JS -->
+            <div class="flex flex-wrap gap-2 mb-4" id="filter-container">
+                <button class="filter-btn bg-gray-200 text-gray-700 hover:bg-blue-100" onclick="setFilter('All')">All Goals</button>
+                <button class="filter-btn bg-gray-200 text-gray-700 hover:bg-blue-100" onclick="setFilter('Daily')">Daily</button>
+                <button class="filter-btn bg-gray-200 text-gray-700 hover:bg-blue-100" onclick="setFilter('Weekly')">Weekly</button>
+                <button class="filter-btn bg-gray-200 text-gray-700 hover:bg-blue-100" onclick="setFilter('Monthly')">Monthly</button>
+                <button class="filter-btn bg-gray-200 text-gray-700 hover:bg-blue-100" onclick="setFilter('Yearly')">Yearly</button>
             </div>
 
-            <!-- Modal Footer -->
-            <div class="p-4 bg-gray-50 border-t flex justify-between">
-                <span id="completion-message" class="text-sm font-medium text-green-600 hidden flex items-center">
-                    <i data-lucide="trophy" class="w-5 h-5 mr-2"></i>
-                    Goal Achieved! Great work!
-                </span>
-                <button onclick="deleteCurrentGoal()" class="flex items-center rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-600 transition duration-150 ease-in-out">
-                    <i data-lucide="trash-2" class="w-4 h-4 mr-2"></i>
-                    Delete Goal
+            <!-- Tag Search Filter -->
+            <div class="flex space-x-2">
+                <input id="tag-search-input" type="text" placeholder="Search by Tag (e.g., 'work')"
+                       class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <button onclick="searchByTag()"
+                        class="px-4 py-3 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition duration-150 shadow-md">
+                    Search
                 </button>
             </div>
         </div>
-    </div>
 
-    <!-- Confirmation Modal Structure -->
-    <div id="confirmation-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div class="p-6">
-                <h3 id="confirm-title" class="text-lg font-bold text-gray-900 mb-2"></h3>
-                <p id="confirm-message" class="text-sm text-gray-600 mb-6"></p>
-                <div class="flex justify-end space-x-3">
-                    <button id="cancel-button" onclick="closeConfirmationModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button id="confirm-button" class="px-4 py-2 text-sm font-medium text-white rounded-lg transition duration-150"></button>
-                </div>
+        <!-- Goals List -->
+        <div id="goals-list" class="space-y-4">
+            <!-- Goals will be rendered here -->
+            <div class="text-center p-8 text-gray-400" id="loading-indicator">
+                <svg class="animate-spin h-5 w-5 text-gray-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Loading goals...
             </div>
+        </div>
+        
+        <!-- User ID Display for Collaboration -->
+        <div class="mt-8 pt-4 border-t border-gray-200 text-center">
+            <p class="text-xs text-gray-400">Your collaborative ID (share to sync goals):</p>
+            <code id="user-id-display" class="text-sm font-mono bg-gray-100 p-1 rounded text-gray-600">ID Loading...</code>
         </div>
     </div>
 
-
+    <!-- Firebase Imports -->
     <script type="module">
-        "use strict";
-
-        // --- FIREBASE IMPORTS AND GLOBAL CONFIG ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        // REMOVED 'setPersistence' and 'browserLocalPersistence' from imports
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-lite.js";
-        
-        // Set Debug logging for Firestore
-        setLogLevel('Debug');
+        import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, serverTimestamp, orderBy, where, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Mandatory Global Variables provided by the environment
+        // Global variables provided by the environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        let firebaseConfig;
-        try {
-            firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        } catch {
-            firebaseConfig = {}; // Fallback
-        }
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        let app;
-        let db;
-        let auth;
-        let userId = null;
-        let unsubscribeGoals = null; // Firestore listener management
-
-        // --- APPLICATION STATE & UTILITIES ---
-
-        let goals = []; // Array to hold local state data synced from Firestore
-        let activeGoalId = null; 
-        let noteDebounceTimeout; // Global variable for note debounce
-
-        /**
-         * Generates a simple unique ID.
-         * @returns {string}
-         */
-        const generateId = () => crypto.randomUUID();
-
-        /**
-         * Formats a date string into a user-friendly format.
-         * @param {string} dateString
-         * @returns {string}
-         */
-        const formatDate = (dateString) => {
-            if (!dateString) return 'N/A';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-        };
-
-        /**
-         * Calculates the progress percentage of a single goal.
-         * @param {Object} goal
-         * @returns {number} Percentage (0-100)
-         */
-        const calculateProgress = (goal) => {
-            if (!goal.subtasks || goal.subtasks.length === 0) return 0;
-            const completedCount = goal.subtasks.filter(task => task.completed).length;
-            return Math.round((completedCount / goal.subtasks.length) * 100);
-        };
-
-        // --- FIREBASE AUTHENTICATION & LISTENERS ---
-
-        /**
-         * Authenticates the user using the custom token or anonymously.
-         * @returns {Promise<string>} The authenticated user's UID.
-         */
-        const authenticateUser = async () => {
-            auth = getAuth(app);
-            if (initialAuthToken) {
-                await signInWithCustomToken(auth, initialAuthToken);
-            } else {
-                await signInAnonymously(auth);
-            }
-            return auth.currentUser?.uid || 'anonymous';
-        };
-        
-        /**
-         * Sets up the real-time Firestore listener for goals.
-         * @param {string} currentUserId
-         */
-        const setupGoalsListener = (currentUserId) => {
-            if (unsubscribeGoals) {
-                unsubscribeGoals(); // Detach previous listener
-            }
-
-            // Path: /artifacts/{appId}/users/{userId}/goals
-            const goalsCollectionRef = collection(db, `artifacts/${appId}/users/${currentUserId}/goals`);
-            // Avoid orderBy() to prevent needing Firestore indexes, sort data in-memory instead.
-            const q = query(goalsCollectionRef); 
-
-            unsubscribeGoals = onSnapshot(q, (snapshot) => {
-                goals = [];
-                snapshot.forEach(doc => {
-                    goals.push({ id: doc.id, ...doc.data() });
-                });
-                renderGoals(); // Renders the dashboard with fresh data
-                
-                // If the modal is open, re-render its content
-                if (activeGoalId) {
-                    const activeGoal = goals.find(g => g.id === activeGoalId);
-                    if (activeGoal) {
-                        // Re-render modal to reflect new progress/checkbox state
-                        renderSubtasksInModal(activeGoal);
-                        updateModalProgress(activeGoal); 
-                    } else {
-                        // Goal was deleted while modal was open
-                        closeEditModal();
-                    }
-                }
-            }, (error) => {
-                console.error("Error setting up goals listener:", error);
-                document.getElementById('empty-state').textContent = "Failed to load goals. Check console for database errors.";
-            });
-        };
-
-        // --- UI RENDERING ---
-        
-        /**
-         * Updates the progress bar and text inside the modal.
-         * @param {Object} goal
-         */
-        const updateModalProgress = (goal) => {
-            const progress = calculateProgress(goal);
-            const isCompleted = progress === 100;
-            const completionMsg = document.getElementById('completion-message');
-
-            const progressBar = document.getElementById('modal-progress-bar');
-            if (progressBar) {
-                progressBar.style.width = `${progress}%`;
-                progressBar.classList.toggle('bg-green-500', isCompleted);
-                progressBar.classList.toggle('bg-indigo-500', !isCompleted);
-            }
-            
-            document.getElementById('modal-progress-text').textContent = `${progress}% Complete`;
-            completionMsg.classList.toggle('hidden', isCompleted === false);
-        };
-
-
-        /**
-         * Renders all goal cards to the main dashboard.
-         */
-        const renderGoals = () => {
-            const container = document.getElementById('goals-container');
-            const emptyState = document.getElementById('empty-state');
-
-            if (!container || !emptyState) return;
-            
-            // Sort by creation date (newest first for dashboard)
-            goals.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-            
-            container.innerHTML = '';
-
-            if (goals.length === 0) {
-                emptyState.textContent = "You haven't added any goals yet. Start tracking your future!";
-                emptyState.classList.remove('hidden');
-                return;
-            }
-            emptyState.classList.add('hidden');
-
-            goals.forEach(goal => {
-                const progress = calculateProgress(goal);
-                const isCompleted = progress === 100;
-                
-                const color = isCompleted ? 'bg-green-500' : 'bg-indigo-500';
-                const cardClasses = isCompleted 
-                    ? 'goal-card bg-white p-6 rounded-xl shadow-lg border-2 border-green-400 transform transition duration-200 cursor-pointer confetti-celebration'
-                    : 'goal-card bg-white p-6 rounded-xl shadow-md border border-gray-200 transform transition duration-200 cursor-pointer';
-                const icon = isCompleted ? 'trophy' : 'target';
-
-                const goalCard = `
-                    <div class="${cardClasses}" onclick="openEditModal('${goal.id}')">
-                        <div class="flex justify-between items-start mb-4">
-                            <h3 class="text-lg font-bold text-gray-900 truncate pr-4 flex items-center">
-                                <i data-lucide="${icon}" class="w-5 h-5 mr-2 text-indigo-500"></i>
-                                ${goal.title}
-                            </h3>
-                            <span class="text-sm font-bold ${isCompleted ? 'text-green-600' : 'text-indigo-600'}">${progress}%</span>
-                        </div>
-                        
-                        <!-- Progress Bar -->
-                        <div class="w-full bg-gray-200 rounded-full h-2 mb-3">
-                            <div class="progress-bar h-2 rounded-full ${color}" style="width: ${progress}%"></div>
-                        </div>
-
-                        <!-- Subtask Summary -->
-                        <p class="text-sm text-gray-500 mb-3">
-                            ${goal.subtasks ? goal.subtasks.filter(task => task.completed).length : 0} of ${goal.subtasks ? goal.subtasks.length : 0} steps completed
-                        </p>
-
-                        <div class="flex justify-end items-center text-xs text-gray-400">
-                            <i data-lucide="calendar-check" class="w-3 h-3 mr-1"></i>
-                            Last Update: ${formatDate(goal.lastUpdated)}
-                        </div>
-                    </div>
-                `;
-                container.innerHTML += goalCard;
-            });
-
-            // Re-render Lucide icons for the newly created HTML
-            lucide.createIcons();
-        };
-
-        /**
-         * Renders the subtasks inside the modal.
-         * @param {Object} goal
-         */
-        const renderSubtasksInModal = (goal) => {
-            const container = document.getElementById('modal-subtasks-container');
-            if (!container || !goal.subtasks) return;
-
-            container.innerHTML = '';
-
-            goal.subtasks.forEach(task => {
-                const checked = task.completed ? 'checked' : '';
-                const taskClass = task.completed ? 'line-through text-gray-400' : 'text-gray-800';
-
-                const subtaskHTML = `
-                    <div class="flex items-center p-3 rounded-lg bg-white shadow-sm border border-gray-200">
-                        <input type="checkbox" id="task-${task.id}" ${checked} 
-                               onclick="toggleSubtask('${goal.id}', '${task.id}')"
-                               class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
-                        <label for="task-${task.id}" class="ml-3 block text-base font-medium ${taskClass} flex-1 cursor-pointer">
-                            ${task.text}
-                        </label>
-                    </div>
-                `;
-                container.innerHTML += subtaskHTML;
-            });
-        };
-
-        // --- MODAL LOGIC ---
-
-        /**
-         * Handles the tab switching inside the edit modal.
-         * @param {string} tabName ('steps' or 'notes')
-         */
-        window.showTab = (tabName) => {
-            const stepsContent = document.getElementById('content-steps');
-            const notesContent = document.getElementById('content-notes');
-            const tabSteps = document.getElementById('tab-steps');
-            const tabNotes = document.getElementById('tab-notes');
-
-            if (tabName === 'steps') {
-                stepsContent.classList.remove('hidden');
-                notesContent.classList.add('hidden');
-                tabSteps.classList.add('border-indigo-500', 'text-indigo-600');
-                tabSteps.classList.remove('border-transparent', 'text-gray-500');
-                tabNotes.classList.add('border-transparent', 'text-gray-500');
-                tabNotes.classList.remove('border-indigo-500', 'text-indigo-600');
-            } else if (tabName === 'notes') {
-                stepsContent.classList.add('hidden');
-                notesContent.classList.remove('hidden');
-                tabNotes.classList.add('border-indigo-500', 'text-indigo-600');
-                tabNotes.classList.remove('border-transparent', 'text-gray-500');
-                tabSteps.classList.add('border-transparent', 'text-gray-500');
-                tabSteps.classList.remove('border-indigo-500', 'text-indigo-600');
-            }
+        let firebaseConfig = null;
+        try {
+            firebaseConfig = typeof __firebase_config !== 'undefined' && __firebase_config ? JSON.parse(__firebase_config) : null;
+        } catch (e) {
+            console.error("Failed to parse __firebase_config. It might contain invalid JSON.", e);
+            firebaseConfig = null; 
         }
 
+        let app, db, auth, userId = null;
+        let allGoals = [];
+        let currentFilter = 'All'; // Can be 'All', 'Daily', 'Weekly', 'Monthly', 'Yearly', or a tag string
 
-        /**
-         * Opens the modal to view and update progress for a specific goal.
-         * @param {string} id - The ID of the goal to edit.
-         */
-        window.openEditModal = (id) => {
-            const goal = goals.find(g => g.id === id);
-            const modal = document.getElementById('edit-modal');
+        // --- 1. FIREBASE INITIALIZATION AND AUTHENTICATION ---
 
-            if (!goal || !modal) return;
-
-            activeGoalId = id;
+        if (firebaseConfig) {
+            setLogLevel('Debug');
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
             
-            document.getElementById('modal-title').textContent = goal.title;
-            
-            // Clear any previous debounce timer when opening modal
-            if (noteDebounceTimeout) clearTimeout(noteDebounceTimeout);
-            document.getElementById('modal-notes').value = goal.notes || ''; // Load notes
-
-            updateModalProgress(goal);
-            
-            // Render subtasks and default to 'steps' tab
-            renderSubtasksInModal(goal);
-            showTab('steps'); 
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            // Re-render icons inside modal
-            lucide.createIcons();
-        };
-
-        /**
-         * Closes the edit modal.
-         */
-        window.closeEditModal = () => {
-            const modal = document.getElementById('edit-modal');
-            if (modal) {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-                activeGoalId = null;
-                if (noteDebounceTimeout) clearTimeout(noteDebounceTimeout);
-            }
-        };
-
-        // --- FIREBASE ACTIONS ---
-
-        /**
-         * Handles the form submission to create a new goal (Firestore `setDoc`).
-         * @param {Event} event
-         */
-        const handleAddGoal = async (event) => {
-            event.preventDefault();
-            if (!userId) return;
-
-            const titleInput = document.getElementById('goal-title');
-            const tasksTextarea = document.getElementById('goal-tasks');
-            
-            if (!titleInput || !tasksTextarea) return;
-
-            const title = titleInput.value.trim();
-            const tasksText = tasksTextarea.value.trim();
-
-            if (!title || !tasksText) {
-                 showConfirmationModal(
-                     'Missing Information',
-                     'Please fill in both the Goal Title and the Actionable Steps.',
-                     closeConfirmationModal, 
-                     'Okay'
-                 );
-                 return;
+            // Function to handle sign-in
+            async function initializeAuth() {
+                if (!auth) return;
+                try {
+                    // FIX: Removed setPersistence to prevent "cannot connect to persistence layer" error.
+                    // Firebase will now default to session persistence (which works).
+                    
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                        console.log("Signed in with custom token.");
+                    } else {
+                        await signInAnonymously(auth);
+                        console.log("Signed in anonymously.");
+                    }
+                } catch (error) {
+                    console.error("Authentication error:", error);
+                    document.getElementById('auth-status').textContent = 'Auth Error. Check console.';
+                }
             }
 
-            // Split tasks by line, filter out empty lines, and map to subtask objects
-            const subtasks = tasksText.split('\n')
-                                     .map(line => line.trim())
-                                     .filter(line => line.length > 0)
-                                     .map(text => ({
-                                         id: generateId(),
-                                         text: text,
-                                         completed: false
-                                     }));
+            // Listen for auth state changes and start Firestore listener
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    document.getElementById('auth-status').textContent = `Authenticated User ID: ${userId}`;
+                    document.getElementById('user-id-display').textContent = userId;
+                    startGoalListener(); // Start listening for data once authenticated
+                } else {
+                    document.getElementById('auth-status').textContent = 'Awaiting Sign-in...';
+                    initializeAuth(); // Attempt sign-in if not signed in
+                }
+            });
+        } else {
+            document.getElementById('auth-status').textContent = 'Firebase Config Missing. Running in read-only mode.';
+        }
 
-            if (subtasks.length === 0) {
-                showConfirmationModal(
-                    'Input Error',
-                    'Please enter at least one actionable step for your goal.',
-                    closeConfirmationModal, 
-                    'Okay'
-                );
+        // --- 2. FIRESTORE DATA FUNCTIONS ---
+
+        function getGoalsCollectionRef() {
+            if (!userId || !db) {
+                console.error("Cannot get collection ref: Database not initialized or User ID not set.");
+                return null;
+            }
+            // Using the public data path structure for collaboration
+            return collection(db, `artifacts/${appId}/public/data/goals`);
+        }
+        
+        /**
+         * Converts comma-separated tag string to an array of trimmed, lowercase strings.
+         */
+        function parseTags(tagsString) {
+            if (!tagsString || typeof tagsString !== 'string') return [];
+            return tagsString.split(',')
+                .map(tag => tag.trim().toLowerCase())
+                .filter(tag => tag.length > 0);
+        }
+
+        /**
+         * Adds a new goal document to Firestore.
+         */
+        window.addGoal = async function() {
+            if (!db) return console.error("Cannot add goal: Database not initialized.");
+            
+            const textInput = document.getElementById('new-goal-text');
+            const dateInput = document.getElementById('new-goal-due-date');
+            const tagsInput = document.getElementById('new-goal-tags');
+
+            const text = textInput.value.trim();
+            const dueDate = dateInput.value; // YYYY-MM-DD string
+            const tags = parseTags(tagsInput.value);
+            
+            if (!userId || !text) {
+                console.warn("Goal text or User ID missing.");
                 return;
             }
 
-            const now = new Date().toISOString();
-            const newGoal = {
-                title: title,
-                createdAt: now,
-                lastUpdated: now, 
-                notes: "", 
-                subtasks: subtasks
-            };
+            const goalsRef = getGoalsCollectionRef();
+            if (!goalsRef) return;
 
             try {
-                // Use setDoc with a generated ID (which becomes the Firestore document ID)
-                const newDocRef = doc(collection(db, `artifacts/${appId}/users/${userId}/goals`));
-                await setDoc(newDocRef, newGoal);
-
-                // Reset form
-                document.getElementById('goal-form').reset();
+                await addDoc(goalsRef, {
+                    text: text,
+                    completed: false,
+                    createdAt: serverTimestamp(),
+                    userId: userId,
+                    dueDate: dueDate || null, // Store as null if empty
+                    tags: tags,
+                });
+                textInput.value = '';
+                dateInput.value = '';
+                tagsInput.value = '';
+                console.log("Goal added successfully.");
             } catch (e) {
                 console.error("Error adding document: ", e);
-                showConfirmationModal('Error', 'Failed to save goal to the database.', closeConfirmationModal, 'Okay');
             }
-        };
-        
-        // --- Slick Auto-Save Logic ---
-
-        /**
-         * Displays the "Saved!" indicator briefly.
-         */
-        const showSavedIndicator = () => {
-            const indicator = document.getElementById('save-indicator');
-            if (!indicator) return;
-
-            indicator.classList.add('visible');
-            setTimeout(() => {
-                indicator.classList.remove('visible');
-            }, 1500);
-        };
-
-        /**
-         * Core function to update the goal note data (Firestore `updateDoc`).
-         */
-        const updateGoalNoteData = (noteText) => {
-            if (!activeGoalId || !userId) return;
-
-            const goalDocRef = doc(db, `artifacts/${appId}/users/${userId}/goals`, activeGoalId);
-
-            // Update the notes and lastUpdated fields
-            updateDoc(goalDocRef, {
-                notes: noteText,
-                lastUpdated: new Date().toISOString()
-            }).then(() => {
-                showSavedIndicator();
-            }).catch(e => {
-                console.error("Error updating document: ", e);
-            });
         }
 
         /**
-         * Handles the note input with debounce for performance and slick saving.
+         * Toggles the completion status of a goal.
          */
-        window.handleNoteInput = (event) => {
-            // Clear the previous timeout
-            if (noteDebounceTimeout) {
-                clearTimeout(noteDebounceTimeout);
-            }
+        window.toggleComplete = async function(goalId, currentStatus) {
+            if (!db) return console.error("Cannot toggle goal: Database not initialized.");
             
-            const noteText = event.target.value;
-            const DEBOUNCE_DELAY_MS = 750; // Wait 0.75 seconds after stop typing
+            const goalsRef = getGoalsCollectionRef();
+            if (!goalsRef) return;
 
-            // Set a new timeout
-            noteDebounceTimeout = setTimeout(() => {
-                updateGoalNoteData(noteText);
-            }, DEBOUNCE_DELAY_MS);
+            try {
+                // Get the specific document reference
+                const goalDocRef = doc(goalsRef, goalId);
+
+                // Use a transaction to ensure atomic update
+                await runTransaction(db, async (transaction) => {
+                    transaction.update(goalDocRef, {
+                        completed: !currentStatus
+                    });
+                });
+
+                console.log(`Goal ${goalId} completion toggled.`);
+            } catch (e) {
+                console.error("Error updating document: ", e);
+            }
         }
-
-        // --- Other Goal Actions ---
-
-        /**
-         * Toggles the completion status of a subtask (Firestore `updateDoc`).
-         * This fetches the current task list, updates it locally, and sends the whole array back.
-         * @param {string} goalId
-         * @param {string} taskId
-         */
-        window.toggleSubtask = (goalId, taskId) => {
-            if (!userId) return;
-
-            const goal = goals.find(g => g.id === goalId);
-            if (!goal) return;
-
-            const taskIndex = goal.subtasks.findIndex(t => t.id === taskId);
-            if (taskIndex === -1) return;
-
-            // Create a deep copy of subtasks to mutate and send back
-            const updatedSubtasks = JSON.parse(JSON.stringify(goal.subtasks));
-            updatedSubtasks[taskIndex].completed = !updatedSubtasks[taskIndex].completed;
-
-            const goalDocRef = doc(db, `artifacts/${appId}/users/${userId}/goals`, goalId);
-
-            updateDoc(goalDocRef, {
-                subtasks: updatedSubtasks,
-                lastUpdated: new Date().toISOString()
-            }).then(() => {
-                // Success! onSnapshot will trigger re-rendering automatically.
-            }).catch(e => {
-                console.error("Error updating subtask: ", e);
-            });
-        };
         
         /**
-         * Deletes the currently active goal (Firestore `deleteDoc`).
+         * Deletes a goal document from Firestore.
          */
-        window.deleteCurrentGoal = () => {
-            if (activeGoalId && userId) {
-                showConfirmationModal(
-                    'Confirm Deletion', 
-                    'Are you sure you want to permanently delete this goal? This action cannot be undone.', 
-                    () => {
-                        const goalDocRef = doc(db, `artifacts/${appId}/users/${userId}/goals`, activeGoalId);
-                        deleteDoc(goalDocRef).then(() => {
-                            // Success! onSnapshot handles the UI update.
-                            closeEditModal();
-                            closeConfirmationModal();
-                        }).catch(e => {
-                            console.error("Error deleting document: ", e);
-                            showConfirmationModal('Deletion Failed', 'Could not delete the goal from the database.', closeConfirmationModal, 'Okay');
-                        });
-                    },
-                    'Delete'
+        window.deleteGoal = async function(goalId) {
+            if (!db) return console.error("Cannot delete goal: Database not initialized.");
+
+            const goalsRef = getGoalsCollectionRef();
+            if (!goalsRef) return;
+
+            try {
+                // Get the specific document reference
+                const goalDocRef = doc(goalsRef, goalId);
+                await deleteDoc(goalDocRef);
+                console.log(`Goal ${goalId} deleted.`);
+            } catch (e) {
+                console.error("Error deleting document: ", e);
+            }
+        }
+
+        /**
+         * Sets up the real-time listener for the goals collection.
+         */
+        function startGoalListener() {
+            if (!db) return console.error("Cannot start listener: Database not initialized.");
+
+            const goalsRef = getGoalsCollectionRef();
+            if (!goalsRef) return;
+
+            // Simple query: get all goals, ordered by creation time
+            const q = query(goalsRef, orderBy('createdAt', 'desc'));
+
+            onSnapshot(q, (snapshot) => {
+                allGoals = [];
+                snapshot.forEach((doc) => {
+                    allGoals.push({ id: doc.id, ...doc.data() });
+                });
+                console.log("Goals updated. Total:", allGoals.length);
+                renderGoals(); // Re-render every time data changes
+                const indicator = document.getElementById('loading-indicator');
+                if (indicator) indicator.classList.add('hidden');
+            }, (error) => {
+                console.error("Firestore snapshot error: ", error);
+            });
+        }
+        
+        // --- 3. FILTERING LOGIC ---
+
+        window.setFilter = function(filterType) {
+            currentFilter = filterType;
+            const tagInput = document.getElementById('tag-search-input');
+            if (tagInput) tagInput.value = ''; // Clear tag search
+            updateFilterButtons(filterType);
+            renderGoals();
+        }
+
+        window.searchByTag = function() {
+            const tagInput = document.getElementById('tag-search-input');
+            const tag = tagInput ? tagInput.value.trim().toLowerCase() : '';
+            
+            if (tag) {
+                currentFilter = tag;
+                updateFilterButtons(tag);
+            } else {
+                setFilter('All');
+            }
+            renderGoals();
+        }
+
+        function updateFilterButtons(activeFilter) {
+            // FIX: Robust check for the container element first, which houses all filter buttons.
+            const container = document.getElementById('filter-container');
+            if (!container) return; 
+
+            // Get all filter buttons inside the container
+            const filterButtons = Array.from(container.querySelectorAll('.filter-btn'));
+
+            filterButtons.forEach(btn => {
+                if (!btn) return; 
+
+                // Reset styling for all buttons
+                btn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                btn.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-blue-100');
+                
+                // Highlight the active button
+                if (btn.textContent.toLowerCase().includes(activeFilter.toLowerCase())) {
+                    btn.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-blue-100');
+                    btn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                }
+            });
+
+            // Highlight search button if tag filter is active
+            const searchBtn = document.querySelector('button[onclick="searchByTag()"]');
+            
+            if (searchBtn) { 
+                if (currentFilter !== 'All' && !['Daily', 'Weekly', 'Monthly', 'Yearly'].includes(currentFilter)) {
+                    // Tag filter is active
+                    searchBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                    searchBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                } else {
+                    // Default green color for search button
+                    searchBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                    searchBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                }
+            }
+        }
+
+        /**
+         * Core function to filter goals based on the current view/tag.
+         */
+        function filterGoals(goals, filter) {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0); // Normalize time for date comparisons
+
+            if (filter === 'All') {
+                return goals;
+            }
+
+            // --- Time-based Filtering ---
+            if (['Daily', 'Weekly', 'Monthly', 'Yearly'].includes(filter)) {
+                return goals.filter(goal => {
+                    if (!goal.dueDate) return false;
+
+                    const goalDate = new Date(goal.dueDate);
+                    goalDate.setHours(0, 0, 0, 0);
+
+                    if (filter === 'Daily') {
+                        // Goals due today
+                        return goalDate.getTime() === now.getTime();
+                    } else if (filter === 'Weekly') {
+                        // Goals due in the next 7 days (including today)
+                        const nextWeek = new Date(now);
+                        nextWeek.setDate(now.getDate() + 7);
+                        return goalDate >= now && goalDate < nextWeek;
+                    } else if (filter === 'Monthly') {
+                        // Goals due in the current month
+                        return goalDate.getFullYear() === now.getFullYear() && goalDate.getMonth() === now.getMonth();
+                    } else if (filter === 'Yearly') {
+                        // Goals due in the current year
+                        return goalDate.getFullYear() === now.getFullYear();
+                    }
+                    return false;
+                });
+            }
+
+            // --- Tag-based Filtering ---
+            if (filter) {
+                const targetTag = filter.toLowerCase();
+                return goals.filter(goal => 
+                    Array.isArray(goal.tags) && goal.tags.includes(targetTag)
                 );
             }
-        };
 
-        // --- CUSTOM CONFIRMATION MODAL (Replaces alert/confirm) ---
+            return goals;
+        }
 
-        let confirmCallback = null;
+        // --- 4. UI RENDERING ---
 
-        /**
-         * Shows the confirmation modal.
-         */
-        const showConfirmationModal = (title, message, callback, confirmText = 'Confirm') => {
-            const modal = document.getElementById('confirmation-modal');
-            const titleEl = document.getElementById('confirm-title');
-            const messageEl = document.getElementById('confirm-message');
-            const confirmBtn = document.getElementById('confirm-button');
-            const cancelBtn = document.getElementById('cancel-button'); 
-
-            if (!modal || !titleEl || !messageEl || !confirmBtn || !cancelBtn) return;
-
-            titleEl.textContent = title;
-            messageEl.textContent = message;
+        function renderGoals() {
+            const listElement = document.getElementById('goals-list');
+            const filteredGoals = filterGoals(allGoals, currentFilter);
             
-            confirmCallback = callback;
-            confirmBtn.textContent = confirmText;
+            if (!listElement) return; // Defensive check for list container
 
-            const isInfoMessage = confirmText.toLowerCase() === 'okay' || confirmText.toLowerCase() === 'close';
-            cancelBtn.classList.toggle('hidden', isInfoMessage);
-            
-            const isDestructive = confirmText.toLowerCase() === 'delete';
-            confirmBtn.classList.toggle('bg-red-600', isDestructive);
-            confirmBtn.classList.toggle('hover:bg-red-700', isDestructive);
-            confirmBtn.classList.toggle('bg-indigo-600', !isDestructive);
-            confirmBtn.classList.toggle('hover:bg-indigo-700', !isDestructive);
-
-            confirmBtn.onclick = () => {
-                if (confirmCallback) {
-                    confirmCallback();
-                }
-            };
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        };
-
-        window.closeConfirmationModal = () => {
-            const modal = document.getElementById('confirmation-modal');
-            if (modal) {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-                confirmCallback = null;
-            }
-        };
-
-        // --- APP INITIALIZATION ---
-
-        /**
-         * Initializes Firebase and the application.
-         */
-        const initApp = async () => {
-            const statusEl = document.getElementById('user-id-display');
-            statusEl.textContent = "Status: Initializing Firebase...";
-
-            if (!firebaseConfig.apiKey) {
-                console.error("Firebase configuration is missing.");
-                statusEl.textContent = "Status: Error - Missing Firebase config.";
-                document.getElementById('empty-state').textContent = "Database configuration error. Cannot connect to persistence layer.";
+            if (filteredGoals.length === 0) {
+                listElement.innerHTML = `<div class="p-8 text-center bg-white rounded-xl shadow-md text-gray-500">
+                    No goals found for the current view (${currentFilter}).
+                </div>`;
                 return;
             }
 
-            try {
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-
-                const authenticatedUserId = await authenticateUser();
-                userId = authenticatedUserId;
+            listElement.innerHTML = filteredGoals.map(goal => {
+                const isCompleted = goal.completed;
+                const statusClass = isCompleted ? 'bg-green-50 border-green-200' : 'bg-white border-blue-200';
+                const textClass = isCompleted ? 'line-through text-gray-400' : 'text-gray-800';
+                const dueText = goal.dueDate ? `Due: ${new Date(goal.dueDate).toLocaleDateString()}` : 'No Deadline';
                 
-                statusEl.textContent = `Status: Authenticated (User ID: ${userId})`;
-                
-                // 1. Set up real-time listener
-                setupGoalsListener(userId);
+                const tagBadges = (goal.tags || []).map(tag => 
+                    `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">#${tag}</span>`
+                ).join('');
 
-                // 2. Set up form listener
-                document.getElementById('goal-form')?.addEventListener('submit', handleAddGoal);
-                
-                // 3. Render all Lucide icons on the page
-                lucide.createIcons();
+                return `
+                    <div class="flex items-center p-4 rounded-xl shadow-md transition duration-150 ${statusClass} border">
+                        <!-- Checkbox -->
+                        <input type="checkbox" ${isCompleted ? 'checked' : ''} 
+                               onclick="toggleComplete('${goal.id}', ${isCompleted})"
+                               class="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 mr-4">
+                        
+                        <!-- Content -->
+                        <div class="flex-grow">
+                            <p class="text-lg font-medium ${textClass}">${goal.text}</p>
+                            <div class="flex flex-wrap items-center mt-1 text-sm text-gray-500 space-x-3">
+                                <span class="text-sm font-semibold ${isCompleted ? 'text-green-500' : 'text-red-500'}">${dueText}</span>
+                                <div class="space-x-1">${tagBadges}</div>
+                            </div>
+                        </div>
 
-            } catch (e) {
-                console.error("Firebase Initialization Error:", e);
-                statusEl.textContent = "Status: Authentication Failed.";
-                showConfirmationModal('Initialization Error', 'Failed to connect to the database. Your goals cannot be loaded or saved.', closeConfirmationModal, 'Close');
-            }
+                        <!-- Delete Button -->
+                        <button onclick="deleteGoal('${goal.id}')"
+                                class="ml-4 p-2 text-red-500 rounded-full hover:bg-red-100 transition duration-150 focus:outline-none focus:ring-2 focus:ring-red-500">
+                            <!-- Trash Icon SVG -->
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+            
+            // Re-apply button highlight after rendering
+            updateFilterButtons(currentFilter);
+        }
+
+        // Initialize with 'All' filter active on load
+        window.onload = function() {
+            updateFilterButtons('All');
         };
-
-        // Call initApp when the script loads
-        initApp(); 
 
     </script>
 </body>
