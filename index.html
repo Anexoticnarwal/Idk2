@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Goal Dashboard (Standalone)</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom styles for appearance */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+        .progress-bar {
+            transition: width 0.3s ease-in-out;
+        }
+        .goal-card {
+            transition: all 0.2s ease-in-out;
+        }
+        .goal-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+        }
+        /* Custom scrollbar for better visual on dark panels */
+        .subtask-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        .subtask-list::-webkit-scrollbar-thumb {
+            background-color: #9ca3af;
+            border-radius: 4px;
+        }
+        .subtask-list::-webkit-scrollbar-track {
+            background-color: #1f2937;
+        }
+        .confetti-celebration {
+            position: relative;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen">
+
+    <!-- Main Container -->
+    <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="mb-8">
+            <h1 class="text-4xl font-extrabold text-gray-900 mb-2 flex items-center">
+                <i data-lucide="sparkles" class="w-8 h-8 mr-3 text-indigo-600"></i>
+                Momentum Dashboard
+            </h1>
+            <p class="text-gray-600">Set clear goals, track actionable steps, and log your progress. (Data saved locally in browser)</p>
+        </header>
+
+        <!-- Goal Creation Section -->
+        <section class="mb-10 bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Add a New Mission</h2>
+            <form id="goal-form" class="space-y-4">
+                <div>
+                    <label for="goal-title" class="block text-sm font-medium text-gray-700">Goal Title</label>
+                    <input type="text" id="goal-title" required placeholder="e.g., Launch New Side Project in 90 Days" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 border">
+                </div>
+                <div>
+                    <label for="goal-tasks" class="block text-sm font-medium text-gray-700 flex justify-between items-center">
+                        Actionable Steps (One per line)
+                    </label>
+                    <textarea id="goal-tasks" required rows="4" placeholder="e.g.,&#10;Define product scope&#10;Build basic authentication&#10;Complete marketing landing page" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 border"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">These are the sub-tasks that determine your goal's progress.</p>
+                </div>
+                <button type="submit" class="w-full sm:w-auto flex items-center justify-center rounded-lg bg-indigo-600 px-6 py-3 text-base font-medium text-white shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-150 ease-in-out">
+                    <i data-lucide="rocket" class="w-5 h-5 mr-2"></i>
+                    Initiate Goal
+                </button>
+            </form>
+        </section>
+
+        <!-- Goal Dashboard -->
+        <section>
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6">Active Goals</h2>
+            <div id="goals-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Goals will be rendered here by JavaScript -->
+                <p id="empty-state" class="text-gray-500 italic col-span-full hidden">You haven't added any goals yet. Start tracking your future!</p>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Edit/Progress Modal -->
+    <div id="edit-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden transition-opacity duration-300 items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all sm:max-w-xl">
+            <!-- Modal Header -->
+            <div class="bg-gray-800 p-6 text-white flex justify-between items-center">
+                <h3 id="modal-title" class="text-xl font-bold truncate">Goal Details</h3>
+                <button onclick="closeEditModal()" class="text-gray-400 hover:text-white transition duration-150">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                    <!-- Use SVG for cross icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M18 6L6 18"/><path d="M6 6L18 18"/></svg>
+                </button>
+            </div>
+
+            <!-- Modal Body: Tabs (Steps vs Notes) -->
+            <div class="p-6">
+                
+                <div class="mb-6">
+                    <h4 class="text-lg font-medium text-gray-700 mb-2">Progress Overview</h4>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div id="modal-progress-bar" class="progress-bar h-3 rounded-full bg-indigo-500" style="width: 0%"></div>
+                    </div>
+                    <p id="modal-progress-text" class="text-sm font-semibold text-gray-600 mt-2">0% Complete</p>
+                </div>
+
+                <!-- Tab Navigation -->
+                <div class="flex border-b border-gray-200 mb-4">
+                    <button id="tab-steps" onclick="showTab('steps')" class="py-2 px-4 text-sm font-medium border-b-2 border-indigo-500 text-indigo-600 transition duration-150">Actionable Steps</button>
+                    <button id="tab-notes" onclick="showTab('notes')" class="py-2 px-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition duration-150">Notes & Reflection</button>
+                </div>
+
+                <!-- Tab Content: Steps -->
+                <div id="content-steps">
+                    <h4 class="text-lg font-medium text-gray-700 mb-3">Steps to Completion</h4>
+                    <div id="modal-subtasks-container" class="space-y-3 max-h-64 overflow-y-auto subtask-list p-2 rounded-lg bg-gray-50 border border-gray-200">
+                        <!-- Subtasks will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Tab Content: Notes -->
+                <div id="content-notes" class="hidden">
+                    <h4 class="text-lg font-medium text-gray-700 mb-3">Goal Notes (Max 500 chars)</h4>
+                    <textarea id="modal-notes" rows="6" maxlength="500" placeholder="Jot down insights, obstacles encountered, or next steps here." 
+                              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 border text-sm"></textarea>
+                    <button onclick="saveGoalNote()" class="mt-3 flex items-center rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-600 transition duration-150 ease-in-out">
+                        <i data-lucide="save" class="w-4 h-4 mr-2"></i>
+                        Save Note
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 bg-gray-50 border-t flex justify-between">
+                <span id="completion-message" class="text-sm font-medium text-green-600 hidden flex items-center">
+                    <i data-lucide="trophy" class="w-5 h-5 mr-2"></i>
+                    Goal Achieved! Great work!
+                </span>
+                <button onclick="deleteCurrentGoal()" class="flex items-center rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-600 transition duration-150 ease-in-out">
+                    <i data-lucide="trash-2" class="w-4 h-4 mr-2"></i>
+                    Delete Goal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal Structure -->
+    <div id="confirmation-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div class="p-6">
+                <h3 id="confirm-title" class="text-lg font-bold text-gray-900 mb-2"></h3>
+                <p id="confirm-message" class="text-sm text-gray-600 mb-6"></p>
+                <div class="flex justify-end space-x-3">
+                    <button id="cancel-button" onclick="closeConfirmationModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button id="confirm-button" class="px-4 py-2 text-sm font-medium text-white rounded-lg transition duration-150"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        "use strict";
+
+        // --- DATA MANAGEMENT & UTILITIES (Using localStorage) ---
+
+        let goals = [];
+        let activeGoalId = null; 
+        const GOALS_STORAGE_KEY = 'personalGoalsDashboardDataV3_local'; 
+
+        /**
+         * Generates a simple unique ID.
+         * @returns {string}
+         */
+        const generateId = () => crypto.randomUUID();
+
+        /**
+         * Formats a date string into a user-friendly format.
+         * @param {string} dateString
+         * @returns {string}
+         */
+        const formatDate = (dateString) => {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        };
+
+        /**
+         * Loads goals from localStorage.
+         */
+        const loadGoals = () => {
+            const data = localStorage.getItem(GOALS_STORAGE_KEY);
+            try {
+                goals = data ? JSON.parse(data) : [];
+            } catch (e) {
+                console.error("Error parsing goals from localStorage:", e);
+                goals = [];
+            }
+        };
+
+        /**
+         * Saves current goals array to localStorage.
+         */
+        const saveGoals = () => {
+            localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals));
+            renderGoals();
+        };
+
+        /**
+         * Calculates the progress percentage of a single goal.
+         * @param {Object} goal
+         * @returns {number} Percentage (0-100)
+         */
+        const calculateProgress = (goal) => {
+            if (!goal.subtasks || goal.subtasks.length === 0) return 0;
+            const completedCount = goal.subtasks.filter(task => task.completed).length;
+            return Math.round((completedCount / goal.subtasks.length) * 100);
+        };
+
+        // --- UI RENDERING ---
+
+        /**
+         * Renders all goal cards to the main dashboard.
+         */
+        const renderGoals = () => {
+            const container = document.getElementById('goals-container');
+            const emptyState = document.getElementById('empty-state');
+
+            if (!container || !emptyState) return;
+            
+            // Sort by creation date (newest first for dashboard)
+            goals.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            
+            container.innerHTML = '';
+
+            if (goals.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            goals.forEach(goal => {
+                const progress = calculateProgress(goal);
+                const isCompleted = progress === 100;
+                
+                const color = isCompleted ? 'bg-green-500' : 'bg-indigo-500';
+                const cardClasses = isCompleted 
+                    ? 'goal-card bg-white p-6 rounded-xl shadow-lg border-2 border-green-400 transform transition duration-200 cursor-pointer confetti-celebration'
+                    : 'goal-card bg-white p-6 rounded-xl shadow-md border border-gray-200 transform transition duration-200 cursor-pointer';
+                const icon = isCompleted ? 'trophy' : 'target';
+
+                const goalCard = `
+                    <div class="${cardClasses}" onclick="openEditModal('${goal.id}')">
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="text-lg font-bold text-gray-900 truncate pr-4 flex items-center">
+                                <i data-lucide="${icon}" class="w-5 h-5 mr-2 text-indigo-500"></i>
+                                ${goal.title}
+                            </h3>
+                            <span class="text-sm font-bold ${isCompleted ? 'text-green-600' : 'text-indigo-600'}">${progress}%</span>
+                        </div>
+                        
+                        <!-- Progress Bar -->
+                        <div class="w-full bg-gray-200 rounded-full h-2 mb-3">
+                            <div class="progress-bar h-2 rounded-full ${color}" style="width: ${progress}%"></div>
+                        </div>
+
+                        <!-- Subtask Summary -->
+                        <p class="text-sm text-gray-500 mb-3">
+                            ${goal.subtasks.filter(task => task.completed).length} of ${goal.subtasks.length} steps completed
+                        </p>
+
+                        <div class="flex justify-end items-center text-xs text-gray-400">
+                            <i data-lucide="calendar-check" class="w-3 h-3 mr-1"></i>
+                            Last Update: ${formatDate(goal.lastUpdated)}
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += goalCard;
+            });
+
+            // Re-render Lucide icons for the newly created HTML
+            lucide.createIcons();
+        };
+
+        /**
+         * Renders the subtasks inside the modal.
+         * @param {Object} goal
+         */
+        const renderSubtasksInModal = (goal) => {
+            const container = document.getElementById('modal-subtasks-container');
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            goal.subtasks.forEach(task => {
+                const checked = task.completed ? 'checked' : '';
+                const taskClass = task.completed ? 'line-through text-gray-400' : 'text-gray-800';
+
+                const subtaskHTML = `
+                    <div class="flex items-center p-3 rounded-lg bg-white shadow-sm border border-gray-200">
+                        <input type="checkbox" id="task-${task.id}" ${checked} 
+                               onclick="toggleSubtask('${goal.id}', '${task.id}')"
+                               class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                        <label for="task-${task.id}" class="ml-3 block text-base font-medium ${taskClass} flex-1 cursor-pointer">
+                            ${task.text}
+                        </label>
+                    </div>
+                `;
+                container.innerHTML += subtaskHTML;
+            });
+        };
+
+        // --- MODAL LOGIC ---
+
+        /**
+         * Handles the tab switching inside the edit modal.
+         * @param {string} tabName ('steps' or 'notes')
+         */
+        window.showTab = (tabName) => {
+            const stepsContent = document.getElementById('content-steps');
+            const notesContent = document.getElementById('content-notes');
+            const tabSteps = document.getElementById('tab-steps');
+            const tabNotes = document.getElementById('tab-notes');
+
+            if (tabName === 'steps') {
+                stepsContent.classList.remove('hidden');
+                notesContent.classList.add('hidden');
+                tabSteps.classList.add('border-indigo-500', 'text-indigo-600');
+                tabSteps.classList.remove('border-transparent', 'text-gray-500');
+                tabNotes.classList.add('border-transparent', 'text-gray-500');
+                tabNotes.classList.remove('border-indigo-500', 'text-indigo-600');
+            } else if (tabName === 'notes') {
+                stepsContent.classList.add('hidden');
+                notesContent.classList.remove('hidden');
+                tabNotes.classList.add('border-indigo-500', 'text-indigo-600');
+                tabNotes.classList.remove('border-transparent', 'text-gray-500');
+                tabSteps.classList.add('border-transparent', 'text-gray-500');
+                tabSteps.classList.remove('border-indigo-500', 'text-indigo-600');
+            }
+        }
+
+
+        /**
+         * Opens the modal to view and update progress for a specific goal.
+         * @param {string} id - The ID of the goal to edit.
+         */
+        window.openEditModal = (id) => {
+            const goal = goals.find(g => g.id === id);
+            const modal = document.getElementById('edit-modal');
+            const completionMsg = document.getElementById('completion-message');
+
+            if (!goal || !modal) return;
+
+            activeGoalId = id;
+            const progress = calculateProgress(goal);
+            const isCompleted = progress === 100;
+
+            document.getElementById('modal-title').textContent = goal.title;
+            document.getElementById('modal-notes').value = goal.notes; // Load notes
+
+            // Progress Bar Update
+            const progressBar = document.getElementById('modal-progress-bar');
+            if (progressBar) {
+                progressBar.style.width = `${progress}%`;
+                progressBar.classList.toggle('bg-green-500', isCompleted);
+                progressBar.classList.toggle('bg-indigo-500', !isCompleted);
+            }
+            
+            document.getElementById('modal-progress-text').textContent = `${progress}% Complete`;
+
+            // Completion Message
+            completionMsg.classList.toggle('hidden', isCompleted === false);
+            
+            // Render subtasks and default to 'steps' tab
+            renderSubtasksInModal(goal);
+            showTab('steps'); 
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            // Re-render icons inside modal
+            lucide.createIcons();
+        };
+
+        /**
+         * Closes the edit modal.
+         */
+        window.closeEditModal = () => {
+            const modal = document.getElementById('edit-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                activeGoalId = null;
+            }
+        };
+
+        // --- GOAL ACTIONS (localStorage) ---
+
+        /**
+         * Handles the form submission to create a new goal.
+         * @param {Event} event
+         */
+        const handleAddGoal = (event) => {
+            event.preventDefault();
+
+            const titleInput = document.getElementById('goal-title');
+            const tasksTextarea = document.getElementById('goal-tasks');
+            
+            if (!titleInput || !tasksTextarea) return;
+
+            const title = titleInput.value.trim();
+            const tasksText = tasksTextarea.value.trim();
+
+            if (!title || !tasksText) {
+                 showConfirmationModal(
+                    'Missing Information',
+                    'Please fill in both the Goal Title and the Actionable Steps.',
+                    closeConfirmationModal, 
+                    'Okay'
+                );
+                return;
+            }
+
+            // Split tasks by line, filter out empty lines, and map to subtask objects
+            const subtasks = tasksText.split('\n')
+                                      .map(line => line.trim())
+                                      .filter(line => line.length > 0)
+                                      .map(text => ({
+                                          id: generateId(),
+                                          text: text,
+                                          completed: false
+                                      }));
+
+            if (subtasks.length === 0) {
+                showConfirmationModal(
+                    'Input Error',
+                    'Please enter at least one actionable step for your goal.',
+                    closeConfirmationModal, 
+                    'Okay'
+                );
+                return;
+            }
+
+            const now = new Date().toISOString();
+            const newGoal = {
+                id: generateId(),
+                title: title,
+                createdAt: now,
+                lastUpdated: now, 
+                notes: "", 
+                subtasks: subtasks
+            };
+
+            goals.push(newGoal);
+            saveGoals();
+
+            // Reset form
+            document.getElementById('goal-form').reset();
+        };
+
+        /**
+         * Saves the note content from the modal to the active goal.
+         */
+        window.saveGoalNote = () => {
+            if (!activeGoalId) return;
+
+            const goalIndex = goals.findIndex(g => g.id === activeGoalId);
+            const notesEl = document.getElementById('modal-notes');
+
+            if (goalIndex !== -1 && notesEl) {
+                goals[goalIndex].notes = notesEl.value.trim();
+                goals[goalIndex].lastUpdated = new Date().toISOString(); 
+                
+                saveGoals(); 
+                
+                showConfirmationModal(
+                    'Note Saved',
+                    'Your reflections have been successfully recorded.',
+                    closeConfirmationModal,
+                    'Close'
+                );
+            }
+        }
+
+
+        /**
+         * Toggles the completion status of a subtask.
+         * @param {string} goalId
+         * @param {string} taskId
+         */
+        window.toggleSubtask = (goalId, taskId) => {
+            const goalIndex = goals.findIndex(g => g.id === goalId);
+
+            if (goalIndex !== -1) {
+                const goal = goals[goalIndex];
+                const taskIndex = goal.subtasks.findIndex(t => t.id === taskId);
+
+                if (taskIndex !== -1) {
+                    goal.subtasks[taskIndex].completed = !goal.subtasks[taskIndex].completed;
+                    goal.lastUpdated = new Date().toISOString(); 
+
+                    saveGoals();
+
+                    // Re-render modal content immediately to show change and update progress bar
+                    openEditModal(goalId);
+                }
+            }
+        };
+        
+        /**
+         * Deletes the currently active goal.
+         */
+        window.deleteCurrentGoal = () => {
+            if (activeGoalId) {
+                showConfirmationModal(
+                    'Confirm Deletion', 
+                    'Are you sure you want to permanently delete this goal? This action cannot be undone.', 
+                    () => {
+                        goals = goals.filter(g => g.id !== activeGoalId);
+                        saveGoals();
+                        closeEditModal();
+                        closeConfirmationModal();
+                    },
+                    'Delete'
+                );
+            }
+        };
+
+        // --- CUSTOM CONFIRMATION MODAL (Replaces alert/confirm) ---
+
+        let confirmCallback = null;
+
+        /**
+         * Shows the confirmation modal.
+         */
+        const showConfirmationModal = (title, message, callback, confirmText = 'Confirm') => {
+            const modal = document.getElementById('confirmation-modal');
+            const titleEl = document.getElementById('confirm-title');
+            const messageEl = document.getElementById('confirm-message');
+            const confirmBtn = document.getElementById('confirm-button');
+            const cancelBtn = document.getElementById('cancel-button'); 
+
+            if (!modal || !titleEl || !messageEl || !confirmBtn || !cancelBtn) return;
+
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+            
+            confirmCallback = callback;
+            confirmBtn.textContent = confirmText;
+
+            const isInfoMessage = confirmText.toLowerCase() === 'okay' || confirmText.toLowerCase() === 'close';
+            cancelBtn.classList.toggle('hidden', isInfoMessage);
+            
+            const isDestructive = confirmText.toLowerCase() === 'delete';
+            confirmBtn.classList.toggle('bg-red-600', isDestructive);
+            confirmBtn.classList.toggle('hover:bg-red-700', isDestructive);
+            confirmBtn.classList.toggle('bg-indigo-600', !isDestructive);
+            confirmBtn.classList.toggle('hover:bg-indigo-700', !isDestructive);
+
+            confirmBtn.onclick = () => {
+                if (confirmCallback) {
+                    confirmCallback();
+                }
+            };
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        };
+
+        window.closeConfirmationModal = () => {
+            const modal = document.getElementById('confirmation-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                confirmCallback = null;
+            }
+        };
+
+        // --- APP INITIALIZATION ---
+
+        /**
+         * Initializes the application.
+         */
+        const initApp = () => {
+            // Load data from localStorage first
+            loadGoals();
+            
+            // Render the UI based on loaded data
+            renderGoals();
+
+            // Set up form listener
+            document.getElementById('goal-form')?.addEventListener('submit', handleAddGoal);
+            
+            // Render all Lucide icons on the page
+            lucide.createIcons();
+        };
+
+        // FIX: Call initApp immediately instead of waiting for DOMContentLoaded 
+        // to ensure it runs correctly inside the Canvas preview environment.
+        initApp(); 
+
+    </script>
+</body>
+</html>
