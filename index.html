@@ -1,72 +1,43 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Star Drift: Asteroid Dodge</title>
+<title>Star Drift</title>
 <style>
-  :root {
-    color-scheme: dark;
-    --bg: #0a0f1e;
-    --fg: #b5c7ff;
-    --hud: rgba(255,255,255,0.08);
-    --accent: #6fa8ff;
-    --danger: #ff6f6f;
-    --ok: #5cffb1;
-  }
+  :root { color-scheme: dark; --bg:#0a0f1e; --fg:#b5c7ff; --hud:rgba(255,255,255,0.08); }
   html, body { margin:0; padding:0; background:var(--bg); height:100%; overflow:hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
   #game { display:block; width:100vw; height:100vh; touch-action:none; }
+
   .hud {
     position:fixed; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center;
-    padding:8px 10px; color:var(--fg); font-size:14px; background:linear-gradient(to bottom, rgba(0,0,0,0.35), transparent);
-    z-index:10;
+    padding:8px 10px; color:var(--fg); font-size:14px; background:linear-gradient(to bottom, rgba(0,0,0,0.35), transparent); z-index:10;
   }
   .hud .pill { background:var(--hud); border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:6px 10px; display:inline-flex; gap:10px; align-items:center; }
   .hud .right { display:flex; align-items:center; gap:8px; }
   .badge { display:inline-block; padding:2px 6px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); font-size:12px; }
-  .notif {
-    position:fixed; left:50%; transform:translateX(-50%); bottom:16px; color:#fff; background:rgba(0,0,0,0.5);
-    border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:8px 12px; font-size:14px; pointer-events:none; z-index:12; display:none;
-  }
-  .controls {
-    position:fixed; bottom:16px; left:16px; right:16px; display:flex; justify-content:space-between; align-items:center; z-index:11;
-    pointer-events:auto;
-  }
-  .stick {
-    width:160px; height:160px; border-radius:50%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.15);
-    position:relative; touch-action:none;
-  }
-  .nub {
-    width:64px; height:64px; border-radius:50%; background:rgba(255,255,255,0.15); border:2px solid rgba(255,255,255,0.35);
-    position:absolute; left:50%; top:50%; transform:translate(-50%, -50%);
-  }
-  .btn {
-    width:96px; height:96px; border-radius:50%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.2);
-    color:var(--fg); display:flex; align-items:center; justify-content:center; font-weight:600; touch-action:manipulation;
-  }
-  .btn:active { background:rgba(255,255,255,0.1); }
+
+  .notif { position:fixed; left:50%; transform:translateX(-50%); bottom:16px; color:#fff; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:8px 12px; font-size:14px; pointer-events:none; z-index:12; display:none; }
+
+  .controls { position:fixed; bottom:16px; left:16px; right:16px; display:flex; justify-content:space-between; align-items:center; z-index:11; pointer-events:auto; }
+  .stick { width:160px; height:160px; border-radius:50%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.15); position:relative; touch-action:none; }
+  .nub { width:64px; height:64px; border-radius:50%; background:rgba(255,255,255,0.16); border:2px solid rgba(255,255,255,0.35); position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); }
+  .btn { width:96px; height:96px; border-radius:50%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.2); color:var(--fg); display:flex; align-items:center; justify-content:center; font-weight:600; touch-action:manipulation; }
+  .btn:active { background:rgba(255,255,255,0.11); }
   @media (min-width: 900px) { .controls { display:none; } }
-  .overlay {
-    position:fixed; inset:0; display:none; align-items:center; justify-content:center; color:var(--fg); z-index:13;
-    backdrop-filter: blur(3px) brightness(0.9);
-  }
+
+  .overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; color:var(--fg); z-index:13; backdrop-filter: blur(3px) brightness(0.9); }
   .overlay.active { display:flex; }
-  .card {
-    background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.15); border-radius:12px; padding:16px; width:min(90vw, 520px);
-  }
+  .card { background:rgba(0,0,0,0.7); border:1px solid rgba(255,255,255,0.15); border-radius:12px; padding:16px; width:min(90vw, 520px); }
   .card h2 { margin-top:0; }
   .shop { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:12px; }
-  .shop button {
-    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); border-radius:8px; color:var(--fg);
-    padding:10px; cursor:pointer;
-  }
-  .shop .row { grid-column: 1 / -1; display:flex; justify-content:space-between; align-items:center; }
+  .shop button { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); border-radius:8px; color:var(--fg); padding:10px; cursor:pointer; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
   .close-touch { margin-top:12px; width:100%; padding:10px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); border-radius:8px; color:#fff; }
 </style>
 </head>
 <body>
-  <canvas id="game" aria-label="Space game" role="img"></canvas>
+  <canvas id="game" aria-label="Space game"></canvas>
 
   <div class="hud">
     <div class="pill">
@@ -80,26 +51,29 @@
       <span class="badge" id="weapon">Blaster</span>
       <span class="badge" id="speed">Speed: 1.0x</span>
       <span class="badge" id="fps">FPS</span>
-      <span class="badge">Auto-saves</span>
+      <span class="badge">Auto-save</span>
     </div>
   </div>
 
-  <div class="controls" aria-hidden="false">
+  <div class="controls">
     <div class="stick" id="stick"><div class="nub" id="nub"></div></div>
-    <div class="btn" id="fireBtn" aria-label="Fire">FIRE</div>
+    <div class="btn" id="fireBtn">FIRE</div>
   </div>
 
-  <div class="overlay" id="planetOverlay">
+  <div class="overlay" id="planetOverlay" style="pointer-events:auto;">
     <div class="card">
       <h2>Planet dock</h2>
-      <p>Safe and paused. Spend credits. Tap "Close" or press Esc to undock.</p>
-      <div class="row">Credits: <span id="shopCredits">0</span> • Wave: <span id="shopWave">1</span></div>
+      <p>Safe and paused. Tap Close or press Esc to undock.</p>
+      <div class="row">
+        <div>Credits: <span id="shopCredits">0</span></div>
+        <div>Wave: <span id="shopWave">1</span></div>
+      </div>
       <div class="shop">
         <button id="buyDamage">Damage + (scales)</button>
         <button id="buyRate">Fire rate + (scales)</button>
         <button id="buySpeed">Speed + (scales)</button>
         <button id="buyShield">Shield + (scales)</button>
-        <button id="buyRepair">Repair to 100 HP</button>
+        <button id="buyRepair">Repair to 100</button>
         <button id="buyDouble">Unlock Double Shot</button>
         <button id="buyPierce">Unlock Piercing</button>
         <button id="buySave">Save now</button>
@@ -126,8 +100,7 @@
       canvas.style.height = H + 'px';
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     }
-    window.addEventListener('resize', resize);
-    resize();
+    addEventListener('resize', resize); resize();
 
     // UI refs
     const hpEl = document.getElementById('hp');
@@ -156,19 +129,19 @@
 
     // Input
     const keys = new Set();
-    window.addEventListener('keydown', (e) => {
+    addEventListener('keydown', (e) => {
       if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
       if (e.key === 'Escape') unpauseFromPlanet();
       keys.add(e.key.toLowerCase());
     });
-    window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+    addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
-    // Mobile controls: smooth analog steering (fixes chunk movement)
+    // Mobile controls: smooth analog steering
     const stick = document.getElementById('stick');
     const nub = document.getElementById('nub');
     const fireBtn = document.getElementById('fireBtn');
     let joyActive = false, joyDX = 0, joyDY = 0, fireHeld = false;
-    let joyVX = 0, joyVY = 0; // smoothed joystick vector
+    let joyVX = 0, joyVY = 0; // smoothed vector
     function setNub(x, y) { nub.style.left = (x * 50 + 50) + '%'; nub.style.top = (y * 50 + 50) + '%'; }
     function joyReset() { joyDX = 0; joyDY = 0; setNub(0,0); }
     stick.addEventListener('pointerdown', (e) => { joyActive = true; stick.setPointerCapture(e.pointerId); });
@@ -194,11 +167,11 @@
     // World
     const world = { pois: [], parallax: [
       { stars: [], count: 140, speed: 0.08, color: '#98a6d6' },
-      { stars: [], count: 90, speed: 0.2, color: '#b7c5ff' },
+      { stars: [], count: 90, speed: 0.2, color: '#b5c7ff' },
       { stars: [], count: 60, speed: 0.4, color: '#e0ecff' }
     ] };
 
-    function genPlanets(count = 40) {
+    function genPlanets(count = 36) {
       world.pois.length = 0;
       for (let i = 0; i < count; i++) {
         const ang = rand(TAU), dist = 1500 + rand(22000);
@@ -209,7 +182,7 @@
           y: Math.sin(ang)*dist,
           size,
           hue: Math.floor(rand(360)),
-          safeRadius: size + 160, // safe zone matches visual planet size (+buffer)
+          safeRadius: size + 140, // matches visual size + buffer
           name: 'Planet-' + (i+1)
         });
       }
@@ -219,7 +192,7 @@
     // Player
     const player = {
       x: 0, y: 0, vx: 0, vy: 0, angle: 0,
-      speed: 290, accel: 15, drag: 0.90,
+      speed: 300, accel: 18, drag: 0.90,
       hp: 100, shield: 0, score: 0, credits: 0,
       fireCooldown: 0, shotRate: 0.16,
       shotSpeed: 660, shotDamage: 10, shotWidth: 2,
@@ -237,39 +210,40 @@
     let paused = false;
 
     function startWave(level) {
-      const count = Math.floor(10 + (level - 1) * 3.5); // Wave 1 = 10 asteroids, increases
+      // Wave 1 = 10 asteroids, increases linearly
+      const count = 10 + (level - 1) * 4;
+      asteroids.length = 0;
       for (let i = 0; i < count; i++) spawnAsteroid(level);
-      waveEl.textContent = level;
-      shopWave.textContent = level;
+      waveEl.textContent = level; shopWave.textContent = level;
+      updateShopGating();
       autoSave(); // auto-save on wave start
     }
 
     // Spawn asteroids aimed at ship initially, then straight-line (no homing)
     function spawnAsteroid(level = waveLevel) {
-      if (player.inSafeZone && Math.random() < 0.9) return; // drastically reduced near planets
-      const dist = 760 + rand(960);
+      const dist = 720 + rand(880);
       const ang = rand(TAU);
       const x = player.x + Math.cos(ang) * dist;
       const y = player.y + Math.sin(ang) * dist;
-      const r = 20 + rand(26) + level * 0.7;
-      const hp = Math.round(28 + level * 6 + rand(18));
-      const speed = 90 + level * 6 + rand(30);
-      const dir = Math.atan2(player.y - y, player.x - x); // point at ship at spawn
+      const r = 20 + rand(26) + level * 0.6;               // size scales
+      const hp = Math.round(24 + level * 6 + rand(16));    // HP scales
+      const speed = 100 + level * 5 + rand(30);            // speed scales
+      const dir = Math.atan2(player.y - y, player.x - x);  // point at ship at spawn
       asteroids.push({
         x, y, r, hp,
         vx: Math.cos(dir) * speed,
         vy: Math.sin(dir) * speed,
-        shape: makeRockShape(r) // store static irregular shape, no spin
+        shape: makeRockShape(r) // static irregular shape, no spin
       });
     }
 
     // Irregular rock shape (non-spinning)
     function makeRockShape(r) {
-      const sides = 6 + Math.floor(rand(3));
+      const sides = 7 + Math.floor(rand(3));
       const pts = [];
       for (let i=0;i<sides;i++) {
         const ang = i * TAU / sides;
-        const rad = r * (0.78 + rand(0.22));
+        const rad = r * (0.75 + rand(0.25));
         pts.push({ x: Math.cos(ang)*rad, y: Math.sin(ang)*rad });
       }
       return pts;
@@ -298,13 +272,9 @@
 
     // Notifications
     let notifTimer = 0;
-    function notify(msg) {
-      notifEl.textContent = msg;
-      notifEl.style.display = 'block';
-      notifTimer = 2.2;
-    }
+    function notify(msg) { notifEl.textContent = msg; notifEl.style.display = 'block'; notifTimer = 2.2; }
 
-    // Auto-save (simplified)
+    // Auto-save
     function autoSave() {
       const data = {
         player: {
@@ -315,10 +285,10 @@
         waveLevel,
         pois: world.pois.map(p => ({ type:p.type, x:p.x, y:p.y, size:p.size, hue:p.hue, safeRadius:p.safeRadius, name:p.name }))
       };
-      try { localStorage.setItem('StarDriftAutoSave', JSON.stringify(data)); } catch {}
+      try { localStorage.setItem('StarDriftAuto', JSON.stringify(data)); } catch {}
     }
     function loadAutoSave() {
-      const raw = localStorage.getItem('StarDriftAutoSave');
+      const raw = localStorage.getItem('StarDriftAuto');
       if (!raw) return;
       try {
         const data = JSON.parse(raw);
@@ -328,10 +298,10 @@
         player.doubleShot = !!s.doubleShot; player.pierce = !!s.pierce;
         waveLevel = data.waveLevel || waveLevel;
         if (Array.isArray(data.pois) && data.pois.length) world.pois = data.pois;
-        notify('Loaded autosave');
-        asteroids.length = 0; startWave(waveLevel);
+        notify('Autosave loaded');
       } catch {}
     }
+    btnSaveNow.addEventListener('click', autoSave);
 
     // Parallax stars
     function initStars() {
@@ -362,7 +332,7 @@
       if (bestDist <= arriveDist || bestDist > showDist) return;
 
       const ang = Math.atan2(best.y - player.y, best.x - player.x);
-      const margin = 24;
+      const margin = 22;
       const cx = W/2, cy = H/2;
       const dx = Math.cos(ang), dy = Math.sin(ang);
       const rx = W/2 - margin, ry = H/2 - margin;
@@ -373,9 +343,9 @@
       ctx.save();
       ctx.translate(ex, ey);
       ctx.rotate(ang);
-      ctx.fillStyle = 'rgba(255,207,111,0.6)';
+      ctx.fillStyle = 'rgba(255,207,111,0.55)';
       ctx.beginPath();
-      ctx.moveTo(11, 0); ctx.lineTo(-6, -4); ctx.lineTo(-6, 4); ctx.closePath();
+      ctx.moveTo(10, 0); ctx.lineTo(-6, -4); ctx.lineTo(-6, 4); ctx.closePath();
       ctx.fill();
       ctx.restore();
     }
@@ -398,23 +368,18 @@
       ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(s.x, s.y, p.size + 2, 0, TAU); ctx.stroke();
 
-      // Label when close
       const d = Math.hypot(player.x - p.x, player.y - p.y);
       if (d < 900) {
         ctx.fillStyle = 'rgba(200,220,255,0.85)';
         ctx.font = '12px sans-serif';
-        ctx.fillText(`${p.name}`, s.x + 10, s.y - p.size - 8);
+        ctx.fillText(`${p.name || 'Planet'}`, s.x + 10, s.y - p.size - 8);
       }
 
-      // Safe zone & docking
       const inSafe = d < p.safeRadius;
       if (inSafe) {
         player.inSafeZone = true;
-        if (d < p.size + 120) {
-          if (!paused) pauseAtPlanet();
-        } else {
-          if (paused) unpauseFromPlanet();
-        }
+        if (d < p.size + 120) { if (!paused) pauseAtPlanet(); }
+        else { if (paused) unpauseFromPlanet(); }
       }
     }
 
@@ -429,15 +394,29 @@
       paused = false;
       planetOverlay.classList.remove('active');
     }
-    btnClose.addEventListener('click', unpauseFromPlanet);
-    planetOverlay.addEventListener('click', (e) => { if (e.target === planetOverlay) unpauseFromPlanet(); });
+    // Make sure mobile close always works
+    btnClose.addEventListener('click', (e) => { e.stopPropagation(); unpauseFromPlanet(); });
+    planetOverlay.addEventListener('click', (e) => {
+      // Only close when clicking outside the card
+      if (e.target === planetOverlay) unpauseFromPlanet();
+    });
 
-    // Simplified shop: 8 buttons, scaling labels
+    // Simplified shop: gate features by wave; keep level 1 minimal
     function cost(base, perWave) { return Math.floor(base + waveLevel * perWave); }
+    function updateShopGating() {
+      // Level gating
+      btnDamage.disabled = false;
+      btnRate.disabled = false;
+      btnSpeed.disabled = waveLevel < 2;
+      btnShield.disabled = waveLevel < 2;
+      btnRepair.disabled = false;
+      btnDouble.disabled = waveLevel < 5 || player.doubleShot;
+      btnPierce.disabled = waveLevel < 10 || player.pierce;
+    }
     function updateShopLabels() {
       btnDamage.textContent = `Damage +${1 + Math.floor(waveLevel/10)} — ${cost(15, 2)} cr`;
-      btnRate.textContent = `Fire rate +${Math.round(5 + waveLevel/5)}% — ${cost(18, 3)} cr`;
-      btnSpeed.textContent = `Speed +${Math.round(5 + waveLevel/6)}% — ${cost(18, 3)} cr`;
+      btnRate.textContent = `Fire rate +${Math.round(5 + waveLevel/6)}% — ${cost(18, 3)} cr`;
+      btnSpeed.textContent = `Speed +${Math.round(5 + waveLevel/7)}% — ${cost(18, 3)} cr`;
       btnShield.textContent = `Shield +${Math.min(25 + Math.floor(waveLevel/3)*5, 120)} — ${cost(12, 2)} cr`;
       btnRepair.textContent = `Repair to 100 — ${cost(8, 1)} cr`;
       btnDouble.textContent = player.doubleShot ? 'Double Shot unlocked' : `Unlock Double Shot — ${cost(35, 5)} cr`;
@@ -447,40 +426,19 @@
       if (player.credits >= c) { player.credits -= c; apply(); notify('Purchased'); updateHUD(); shopCredits.textContent = player.credits; autoSave(); }
       else { notify('Not enough credits'); }
     }
-    btnDamage.addEventListener('click', () => {
-      tryBuy(cost(15, 2), () => { player.shotDamage += (1 + Math.floor(waveLevel/10)); });
-    });
-    btnRate.addEventListener('click', () => {
-      const pct = (5 + waveLevel/5) / 100;
-      tryBuy(cost(18, 3), () => { player.shotRate = Math.max(0.05, player.shotRate * (1 - pct)); });
-    });
-    btnSpeed.addEventListener('click', () => {
-      const pct = (5 + waveLevel/6) / 100;
-      tryBuy(cost(18, 3), () => { player.speed *= (1 + pct); speedEl.textContent = `Speed: ${(player.speed/290).toFixed(1)}x`; });
-    });
-    btnShield.addEventListener('click', () => {
-      const add = Math.min(25 + Math.floor(waveLevel/3)*5, 120);
-      tryBuy(cost(12, 2), () => { player.shield = Math.min(120, player.shield + add); });
-    });
+    btnDamage.addEventListener('click', () => { tryBuy(cost(15, 2), () => { player.shotDamage += (1 + Math.floor(waveLevel/10)); }); });
+    btnRate.addEventListener('click', () => { const pct = (5 + waveLevel/6) / 100; tryBuy(cost(18, 3), () => { player.shotRate = Math.max(0.05, player.shotRate * (1 - pct)); }); });
+    btnSpeed.addEventListener('click', () => { const pct = (5 + waveLevel/7) / 100; tryBuy(cost(18, 3), () => { player.speed *= (1 + pct); speedEl.textContent = `Speed: ${(player.speed/300).toFixed(1)}x`; }); });
+    btnShield.addEventListener('click', () => { const add = Math.min(25 + Math.floor(waveLevel/3)*5, 120); tryBuy(cost(12, 2), () => { player.shield = Math.min(120, player.shield + add); }); });
     btnRepair.addEventListener('click', () => { tryBuy(cost(8, 1), () => { player.hp = 100; }); });
-    btnDouble.addEventListener('click', () => {
-      if (player.doubleShot) return;
-      tryBuy(cost(35, 5), () => { player.doubleShot = true; weaponEl.textContent = 'Double Blaster'; });
-    });
-    btnPierce.addEventListener('click', () => {
-      if (player.pierce) return;
-      tryBuy(cost(40, 6), () => { player.pierce = true; });
-    });
-    btnSaveNow.addEventListener('click', autoSave);
+    btnDouble.addEventListener('click', () => { if (player.doubleShot) return; tryBuy(cost(35, 5), () => { player.doubleShot = true; weaponEl.textContent = 'Double Blaster'; updateShopGating(); updateShopLabels(); }); });
+    btnPierce.addEventListener('click', () => { if (player.pierce) return; tryBuy(cost(40, 6), () => { player.pierce = true; updateShopGating(); updateShopLabels(); }); });
 
-    // Drone (kept out of shop for simplicity). If you want it later, add similar button.
     // Steering smoothing
     function smoothAnalog(dt) {
-      // critically damped smoothing of joystick vector to avoid chunking
-      const targetX = joyDX, targetY = joyDY;
-      const lerp = 1 - Math.exp(-12 * dt); // fast smoothing, frame-rate independent
-      joyVX += (targetX - joyVX) * lerp;
-      joyVY += (targetY - joyVY) * lerp;
+      const lerp = 1 - Math.exp(-14 * dt); // fast smoothing
+      joyVX += (joyDX - joyVX) * lerp;
+      joyVY += (joyDY - joyVY) * lerp;
     }
 
     // Drawing helpers
@@ -496,18 +454,7 @@
       }
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = 'rgba(230,240,255,0.12)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      // veins
-      ctx.strokeStyle = 'rgba(180,190,220,0.15)';
-      ctx.beginPath();
-      for (let i=0;i<2;i++){
-        const ang = rand(TAU);
-        ctx.moveTo(s.x + Math.cos(ang)*a.r*0.2, s.y + Math.sin(ang)*a.r*0.2);
-        ctx.lineTo(s.x + Math.cos(ang)*a.r*0.85, s.y + Math.sin(ang)*a.r*0.85);
-      }
-      ctx.stroke();
+      ctx.strokeStyle = 'rgba(230,240,255,0.12)'; ctx.lineWidth = 2; ctx.stroke();
     }
     function explode(x, y, color = '#ffd29e', n = 14) {
       for (let i = 0; i < n; i++) {
@@ -522,14 +469,14 @@
       shieldEl.textContent = Math.round(player.shield);
       scoreEl.textContent = player.score;
       creditsEl.textContent = player.credits;
-      speedEl.textContent = `Speed: ${(player.speed/290).toFixed(1)}x`;
+      speedEl.textContent = `Speed: ${(player.speed/300).toFixed(1)}x`;
       weaponEl.textContent = player.doubleShot ? 'Double Blaster' : 'Blaster';
     }
 
     // Main loop
     let last = performance.now(), fpsAcc = 0, fpsFrames = 0, fps = 0;
+    loadAutoSave(); // load before starting
     startWave(waveLevel);
-    loadAutoSave();
 
     function loop(now) {
       requestAnimationFrame(loop);
@@ -577,20 +524,16 @@
       if (!paused) {
         for (let i = bullets.length-1; i >= 0; i--) {
           const b = bullets[i];
-          b.x += b.vx * dt;
-          b.y += b.vy * dt;
-          b.life -= dt;
+          b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
           if (b.life <= 0) bullets.splice(i,1);
         }
       }
 
       // Asteroids
       if (!paused) {
-        const slowFactor = 1;
         for (let i = asteroids.length-1; i >= 0; i--) {
           const a = asteroids[i];
-          a.x += a.vx * dt * slowFactor;
-          a.y += a.vy * dt * slowFactor;
+          a.x += a.vx * dt; a.y += a.vy * dt;
 
           // Bullet hits
           for (let j = bullets.length-1; j >= 0; j--) {
@@ -608,7 +551,7 @@
             }
           }
 
-          // Player collision: damage scales with wave (start 5, increase)
+          // Player collision: damage scales with wave (start 5, increase). Explode asteroid on hit.
           if ((a.x-player.x)**2 + (a.y-player.y)**2 <= (a.r+14)**2) {
             const base = 5;
             const scaled = Math.floor(waveLevel * 0.6);
@@ -620,9 +563,8 @@
             } else {
               player.hp -= dmg;
             }
-            explode(player.x, player.y, '#ff7f7f', 10);
-            const dx = a.x - player.x, dy = a.y - player.y, len = Math.hypot(dx, dy) || 1;
-            a.vx += (dx/len) * 40; a.vy += (dy/len) * 40;
+            explode(a.x, a.y); // explode asteroid
+            asteroids.splice(i,1); // remove asteroid
 
             if (player.hp <= 0) {
               player.credits = Math.floor(player.credits * 0.5); // lose 50%
@@ -633,10 +575,10 @@
           }
         }
 
-        // Maintain wave pressure: if asteroids too few, spawn mini batch
-        const desired = Math.floor(10 + (waveLevel - 1) * 3.5);
-        if (asteroids.length < Math.floor(desired * 0.35)) {
-          const add = Math.min(5, desired - asteroids.length);
+        // Maintain wave pressure consistently (not reduced by movement)
+        const desired = 10 + (waveLevel - 1) * 4;
+        if (asteroids.length < Math.floor(desired * 0.4)) {
+          const add = Math.min(6, desired - asteroids.length);
           for (let i = 0; i < add; i++) spawnAsteroid();
         }
       }
@@ -719,27 +661,18 @@
     function respawnSameWave() {
       player.hp = 100; player.shield = 0;
       player.x = 0; player.y = 0; player.vx = 0; player.vy = 0;
-      bullets.length = 0; asteroids.length = 0; particles.length = 0;
+      bullets.length = 0; particles.length = 0;
       paused = false; planetOverlay.classList.remove('active');
       startWave(waveLevel);
       updateHUD();
     }
 
-    // Respawn hotkey
-    window.addEventListener('keydown', (e) => {
-      if (e.key.toLowerCase() === 'r') {
-        notify('Respawning wave ' + waveLevel);
-        respawnSameWave();
-      }
-    });
-
-    // Autosave load tip
-    window.addEventListener('load', () => {
-      notify('Hold Space or tap FIRE to shoot. Dock at planets to shop.');
+    // Start and tip
+    addEventListener('load', () => {
+      notify('Hold Space or tap FIRE to shoot. Dock at planets to shop. Press Esc or Close to undock.');
       setTimeout(() => { notifEl.style.display = 'none'; }, 3000);
     });
   })();
   </script>
 </body>
 </html>
-```
