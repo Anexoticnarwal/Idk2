@@ -107,10 +107,9 @@
   const planetOverlay = document.getElementById('planetOverlay');
   const shopCredits = document.getElementById('shopCredits');
   const shopWave = document.getElementById('shopWave');
-  const btnClose = document.getElementById('closeShop');
-
   const btnDamage = document.getElementById('buyDamage');
   const btnRepair = document.getElementById('buyRepair');
+  const btnClose = document.getElementById('closeShop');
 
   // Input
   const keys = new Set();
@@ -121,12 +120,12 @@
   });
   addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
-  // Mobile controls: low-latency smoothing
+  // Mobile controls
   const stick = document.getElementById('stick');
   const nub = document.getElementById('nub');
   const fireBtn = document.getElementById('fireBtn');
   let joyActive = false, joyDX = 0, joyDY = 0, fireHeld = false;
-  let joyVX = 0, joyVY = 0; // smoothed
+  let joyVX = 0, joyVY = 0;
   function setNub(x, y) { nub.style.left = (x * 50 + 50) + '%'; nub.style.top = (y * 50 + 50) + '%'; }
   function joyReset() { joyDX = 0; joyDY = 0; setNub(0,0); }
   stick.addEventListener('pointerdown', (e) => { joyActive = true; stick.setPointerCapture(e.pointerId); });
@@ -149,16 +148,30 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const rand = (n=1) => Math.random() * n;
 
-  // World
-  const world = { pois: [] };
+  // Parallax stars
+  const parallax = [
+    { stars: [], count: 140, speed: 0.08, color: '#98a6d6' },
+    { stars: [], count: 90, speed: 0.20, color: '#b7c5ff' },
+    { stars: [], count: 60, speed: 0.40, color: '#e0ecff' }
+  ];
+  function initStars() {
+    parallax.forEach(layer => {
+      layer.stars.length = 0;
+      for (let i = 0; i < layer.count; i++) {
+        layer.stars.push({ x: rand(W), y: rand(H) });
+      }
+    });
+  }
+  initStars();
 
-  function genPlanets(count = 24) {
-    world.pois.length = 0;
+  // Planets
+  const planets = [];
+  function genPlanets(count = 20) {
+    planets.length = 0;
     for (let i = 0; i < count; i++) {
       const ang = rand(TAU), dist = 1600 + rand(20000);
       const size = 60 + rand(60);
-      world.pois.push({
-        type:'planet',
+      planets.push({
         x: Math.cos(ang)*dist,
         y: Math.sin(ang)*dist,
         size,
@@ -177,7 +190,6 @@
     hp: 100, shield: 0, score: 0, credits: 0,
     fireCooldown: 0, shotRate: 0.13,
     shotSpeed: 680, shotDamage: 10, shotWidth: 2,
-    doubleShot: false, pierce: false,
     inSafeZone: false
   };
 
@@ -196,10 +208,9 @@
     for (let i = 0; i < count; i++) spawnAsteroid(level);
     waveEl.textContent = level;
     shopWave.textContent = level;
-    autoSave();
   }
 
-  // Asteroids: spawned aimed at the ship (no homing), non-spinning shapes
+  // Asteroids
   function spawnAsteroid(level = waveLevel) {
     const dist = 760 + rand(960);
     const ang = rand(TAU);
@@ -233,53 +244,20 @@
     if (player.fireCooldown > 0) return;
     player.fireCooldown = player.shotRate;
     const baseAng = player.angle;
-    const n = player.doubleShot ? 2 : 1;
-    for (let i = 0; i < n; i++) {
-      const ang = baseAng + (player.doubleShot ? (i === 0 ? -0.1 : 0.1) : 0);
-      bullets.push({
-        x: player.x + Math.cos(baseAng)*18,
-        y: player.y + Math.sin(baseAng)*18,
-        vx: Math.cos(ang)*player.shotSpeed + player.vx*0.25,
-        vy: Math.sin(ang)*player.shotSpeed + player.vy*0.25,
-        life: 1.2,
-        w: player.shotWidth,
-        dmg: player.shotDamage,
-        pierce: player.pierce ? 2 : 0
-      });
-    }
+    bullets.push({
+      x: player.x + Math.cos(baseAng)*18,
+      y: player.y + Math.sin(baseAng)*18,
+      vx: Math.cos(baseAng)*player.shotSpeed + player.vx*0.25,
+      vy: Math.sin(baseAng)*player.shotSpeed + player.vy*0.25,
+      life: 1.2,
+      w: player.shotWidth,
+      dmg: player.shotDamage
+    });
   }
 
   // Notifications
   let notifTimer = 0;
   function notify(msg) { notifEl.textContent = msg; notifEl.style.display = 'block'; notifTimer = 2.2; }
-
-  // Auto-save
-  function autoSave() {
-    const data = {
-      player: {
-        hp: player.hp, shield: player.shield, score: player.score, credits: player.credits,
-        shotDamage: player.shotDamage, shotRate: player.shotRate, speed: player.speed,
-        doubleShot: player.doubleShot, pierce: player.pierce
-      },
-      waveLevel,
-      pois: world.pois.map(p => ({ type:p.type, x:p.x, y:p.y, size:p.size, hue:p.hue, safeRadius:p.safeRadius, name:p.name }))
-    };
-    try { localStorage.setItem('StarDriftAuto', JSON.stringify(data)); } catch {}
-  }
-  function loadAutoSave() {
-    const raw = localStorage.getItem('StarDriftAuto');
-    if (!raw) return;
-    try {
-      const data = JSON.parse(raw);
-      const s = data.player;
-      player.hp = s.hp; player.shield = s.shield; player.score = s.score; player.credits = s.credits;
-      player.shotDamage = s.shotDamage; player.shotRate = s.shotRate; player.speed = s.speed;
-      player.doubleShot = !!s.doubleShot; player.pierce = !!s.pierce;
-      waveLevel = data.waveLevel || waveLevel;
-      if (Array.isArray(data.pois) && data.pois.length) world.pois = data.pois;
-      notify('Autosave loaded');
-    } catch {}
-  }
 
   // Shop
   function pauseAtPlanet() {
@@ -302,21 +280,20 @@
     btnRepair.textContent = `Repair to 100 — ${cost(8, 1)} cr`;
   }
   function tryBuy(c, apply) {
-    if (player.credits >= c) { player.credits -= c; apply(); notify('Purchased'); updateHUD(); shopCredits.textContent = player.credits; autoSave(); }
+    if (player.credits >= c) { player.credits -= c; apply(); notify('Purchased'); updateHUD(); shopCredits.textContent = player.credits; }
     else { notify('Not enough credits'); }
   }
   btnDamage.addEventListener('click', () => { tryBuy(cost(12, 2), () => { player.shotDamage += (1 + Math.floor(waveLevel/12)); }); });
   btnRepair.addEventListener('click', () => { tryBuy(cost(8, 1), () => { player.hp = 100; }); });
 
-  // Steering smoothing: more responsive
+  // Steering smoothing (responsive)
   function smoothAnalog(dt) {
-    // high responsiveness with low latency
-    const lerp = 1 - Math.exp(-24 * dt);
+    const lerp = 1 - Math.exp(-28 * dt);
     joyVX += (joyDX - joyVX) * lerp;
     joyVY += (joyDY - joyVY) * lerp;
   }
 
-  // Drawing
+  // Drawing helpers
   function drawAsteroid(a) {
     const s = toScreen(a.x, a.y);
     if (s.x < -a.r-40 || s.x > W+a.r+40 || s.y < -a.r-40 || s.y > H+a.r+40) return;
@@ -331,7 +308,6 @@
     ctx.fill();
     ctx.strokeStyle = 'rgba(230,240,255,0.12)'; ctx.lineWidth = 2; ctx.stroke();
   }
-
   function explode(x, y, color = '#ffd29e', n = 14) {
     for (let i = 0; i < n; i++) {
       const ang = rand(TAU), sp = 120 + rand(160);
@@ -346,13 +322,13 @@
     scoreEl.textContent = player.score;
     creditsEl.textContent = player.credits;
     speedEl.textContent = `Speed: ${(player.speed/320).toFixed(1)}x`;
-    weaponEl.textContent = player.doubleShot ? 'Double Blaster' : 'Blaster';
+    weaponEl.textContent = 'Blaster';
   }
 
   // Transform
   function toScreen(x,y) { return { x: x - player.x + W/2, y: y - player.y + H/2 }; }
 
-  // Planet visuals + docking
+  // Planets
   function drawPlanet(p) {
     const s = toScreen(p.x, p.y);
     if (s.x < -p.size-200 || s.x > W+p.size+200 || s.y < -p.size-200 || s.y > H+p.size+200) return;
@@ -391,7 +367,6 @@
 
     smoothAnalog(dt);
 
-    // Input
     const up = keys.has('arrowup') || keys.has('w') || joyVY < -0.12;
     const down = keys.has('arrowdown') || keys.has('s') || joyVY > 0.12;
     const left = keys.has('arrowleft') || keys.has('a') || joyVX < -0.12;
@@ -402,7 +377,6 @@
       const ax = (right - left) * player.accel + joyVX * player.accel * 1.4;
       const ay = (down - up) * player.accel + joyVY * player.accel * 1.4;
       player.vx += ax; player.vy += ay;
-
       const maxV = player.speed;
       const vLen = Math.hypot(player.vx, player.vy);
       if (vLen > maxV) { const k = maxV / vLen; player.vx *= k; player.vy *= k; }
@@ -410,13 +384,28 @@
       player.x += player.vx * dt * 60 * 0.016;
       player.y += player.vy * dt * 60 * 0.016;
       if (vLen > 1) player.angle = Math.atan2(player.vy, player.vx);
-
       player.fireCooldown = Math.max(0, player.fireCooldown - dt);
       if (shooting) fire();
     }
 
-    // Safe zone detection (reset before planets draw)
+    // Background
+    ctx.fillStyle = '#060a16';
+    ctx.fillRect(0,0,W,H);
+    parallax.forEach(layer => {
+      ctx.fillStyle = layer.color;
+      const ox = -player.vx * layer.speed * dt;
+      const oy = -player.vy * layer.speed * dt;
+      for (const s of layer.stars) {
+        s.x += ox; s.y += oy;
+        if (s.x < 0) s.x += W; if (s.x >= W) s.x -= W;
+        if (s.y < 0) s.y += H; if (s.y >= H) s.y -= H;
+        ctx.fillRect(s.x|0, s.y|0, 1, 1);
+      }
+    });
+
+    // Reset safe zone before planets
     player.inSafeZone = false;
+    for (const p of planets) drawPlanet(p);
 
     // Bullets
     if (!paused) {
@@ -427,23 +416,22 @@
       }
     }
 
-    // Asteroids
+    // Asteroids updates
     if (!paused) {
       for (let i = asteroids.length-1; i >= 0; i--) {
         const a = asteroids[i];
         a.x += a.vx * dt; a.y += a.vy * dt;
 
-        // Respawn and re-aim if off-screen (beyond margin)
-        const s = toScreen(a.x, a.y);
+        // Off-screen: respawn around player and re-aim
+        const scr = toScreen(a.x, a.y);
         const margin = 80;
-        if (s.x < -margin || s.x > W + margin || s.y < -margin || s.y > H + margin) {
-          // Reposition around player and re-aim
-          const dist = 760 + rand(960);
+        if (scr.x < -margin || scr.x > W + margin || scr.y < -margin || scr.y > H + margin) {
+          const dist = 700 + rand(500);
           const ang = rand(TAU);
           a.x = player.x + Math.cos(ang) * dist;
           a.y = player.y + Math.sin(ang) * dist;
           const dir = Math.atan2(player.y - a.y, player.x - a.x);
-          const speed = Math.hypot(a.vx, a.vy);
+          const speed = Math.hypot(a.vx, a.vy) || (110 + waveLevel * 5);
           a.vx = Math.cos(dir) * speed;
           a.vy = Math.sin(dir) * speed;
           continue;
@@ -454,7 +442,7 @@
           const b = bullets[j];
           if ((a.x-b.x)**2 + (a.y-b.y)**2 <= (a.r+3)**2) {
             a.hp -= b.dmg;
-            if (b.pierce > 0) { b.pierce--; } else { bullets.splice(j,1); }
+            bullets.splice(j,1);
             if (a.hp <= 0) {
               player.score += Math.round(10 + a.r);
               player.credits += 5;
@@ -465,11 +453,9 @@
           }
         }
 
-        // Player collision: explode asteroid and damage player (5 + scales with wave)
+        // Player collision
         if ((a.x-player.x)**2 + (a.y-player.y)**2 <= (a.r+14)**2) {
-          const base = 5;
-          const scaled = Math.floor(waveLevel * 0.6);
-          const dmg = base + scaled;
+          const dmg = 5 + Math.floor(waveLevel * 0.6);
           if (player.shield > 0) {
             const absorb = Math.min(player.shield, dmg);
             player.shield -= absorb;
@@ -479,7 +465,6 @@
           }
           explode(a.x, a.y);
           asteroids.splice(i,1);
-
           if (player.hp <= 0) {
             player.credits = Math.floor(player.credits * 0.5);
             notify('Ship destroyed. Lost 50% credits. Respawning wave ' + waveLevel);
@@ -497,6 +482,9 @@
       }
     }
 
+    // Render asteroids
+    for (const a of asteroids) drawAsteroid(a);
+
     // Particles
     for (let i = particles.length-1; i >= 0; i--) {
       const p = particles[i];
@@ -508,16 +496,6 @@
       ctx.globalAlpha = 1;
       if (p.life <= 0) particles.splice(i,1);
     }
-
-    // Background
-    ctx.fillStyle = '#060a16';
-    ctx.fillRect(0,0,W,H);
-
-    // Planets
-    for (const p of world.pois) { if (p.type === 'planet') drawPlanet(p); }
-
-    // Asteroids
-    for (const a of asteroids) drawAsteroid(a);
 
     // Bullets
     ctx.strokeStyle = '#b7c5ff';
@@ -556,7 +534,6 @@
     updateHUD();
     if (notifTimer > 0) { notifTimer -= dt; if (notifTimer <= 0) notifEl.style.display = 'none'; }
   }
-  requestAnimationFrame(loop);
 
   function respawnSameWave() {
     player.hp = 100; player.shield = 0;
@@ -567,9 +544,10 @@
     updateHUD();
   }
 
-  // Load/save and start
-  loadAutoSave();
+  // Start correctly: init stars, generate planets, start wave, then start loop
   startWave(waveLevel);
+  requestAnimationFrame(loop);
+
   addEventListener('load', () => {
     notify('Drag the joystick to steer. Tap the right circle to shoot. Dock at planets to shop.');
     setTimeout(() => { notifEl.style.display = 'none'; }, 3000);
@@ -578,4 +556,3 @@
 </script>
 </body>
 </html>
-```
