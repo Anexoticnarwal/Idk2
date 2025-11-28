@@ -1,477 +1,645 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Goal Tracker — Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-        .details-container { max-height: 0; opacity: 0; transition: max-height 0.36s ease-in-out, opacity 0.28s ease-in-out; overflow: hidden; }
-        .details-container.expanded { max-height: 2000px; opacity: 1; padding-top: 0.5rem; }
-        .form-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); border-color: #3b82f6; }
-        .toggle-step { accent-color: #059669; }
-        /* PowerBI-like large tile visuals */
-        .goal-tile { min-height: 150px; display: flex; flex-direction: column; justify-content: space-between; }
-        .kpi-big { font-size: 1.7rem; line-height: 1; }
-        .tile-scroll { max-height: 360px; overflow-y: auto; padding-right: 6px; }
-        @media (min-width: 1024px) {
-            /* make tiles slightly larger on wide screens */
-            .goal-tile { min-height: 170px; }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Star Drift: Asteroid Dodge</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0f1e;
+      --fg: #b5c7ff;
+      --accent: #6fa8ff;
+      --danger: #ff6f6f;
+      --ok: #5cffb1;
+      --hud: rgba(255,255,255,0.08);
+    }
+    html, body {
+      margin: 0; padding: 0; background: var(--bg); height: 100%; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    #game {
+      display: block; width: 100vw; height: 100vh;
+      touch-action: none; /* prevent scroll on touch */
+    }
+    /* HUD */
+    .hud {
+      position: fixed; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 10px; color: var(--fg); font-size: 14px; background: linear-gradient(to bottom, rgba(0,0,0,0.35), transparent);
+      pointer-events: none; z-index: 10;
+    }
+    .hud .pill { background: var(--hud); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 6px 10px; margin-right: 8px; display: inline-flex; gap: 8px; align-items: center; }
+    .hud .right { display: flex; align-items: center; gap: 6px; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); font-size: 12px; }
+    .notif {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: 16px; color: #fff; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px;
+      padding: 8px 12px; font-size: 14px; pointer-events: none; z-index: 12;
+    }
+    /* Mobile controls */
+    .controls {
+      position: fixed; bottom: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: center; z-index: 11;
+      pointer-events: auto;
+    }
+    .stick {
+      width: 140px; height: 140px; border-radius: 50%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.15);
+      position: relative; touch-action: none;
+    }
+    .nub {
+      width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.35);
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    }
+    .btn {
+      width: 90px; height: 90px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.2);
+      color: var(--fg); display: flex; align-items: center; justify-content: center; font-weight: 600; touch-action: manipulation;
+    }
+    .btn:active { background: rgba(255,255,255,0.1); }
+    @media (min-width: 900px) {
+      .controls { display: none; } /* hide controls on desktop */
+    }
+    /* Pause overlay */
+    .overlay {
+      position: fixed; inset: 0; backdrop-filter: blur(3px) brightness(0.9);
+      display: none; align-items: center; justify-content: center; color: var(--fg); z-index: 13;
+    }
+    .overlay.active { display: flex; }
+    .card {
+      background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 16px; width: min(90vw, 540px);
+    }
+    .card h2 { margin-top: 0; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row .badge { cursor: default; }
+    /* Accessibility */
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+  </style>
 </head>
-<body class="min-h-screen">
-    <main class="max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <!-- Top summary and controls -->
-        <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <h1 class="text-2xl font-extrabold text-gray-800">Goal Dashboard</h1>
-                <p class="text-sm text-gray-500 mt-1">Side-by-side panels for Daily and Long‑term goals. Works on mobile (stacked).</p>
-            </div>
-            <div class="flex items-center gap-3">
-                <div id="summary-daily" class="text-center px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-100">
-                    <div class="text-xs text-emerald-700 font-semibold">Daily</div>
-                    <div id="summary-daily-count" class="font-bold text-emerald-800">0</div>
-                </div>
-                <div id="summary-long" class="text-center px-3 py-2 rounded-lg bg-indigo-50 border border-indigo-100">
-                    <div class="text-xs text-indigo-700 font-semibold">Long‑term</div>
-                    <div id="summary-long-count" class="font-bold text-indigo-800">0</div>
-                </div>
-            </div>
-        </div>
+<body>
+  <canvas id="game" aria-label="Space game" role="img"></canvas>
 
-        <!-- Panels: side-by-side on wide screens, stacked on mobile -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <!-- DAILY GOALS PANEL -->
-            <section id="daily-panel" class="bg-white p-4 rounded-2xl shadow-xl border border-gray-100">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-bold text-emerald-700">Daily Goals</h2>
-                    <div class="text-sm text-gray-500" id="daily-subtext">Today: <span id="daily-today-completed">0</span>/<span id="daily-today-total">0</span></div>
-                </div>
+  <div class="hud" aria-hidden="false">
+    <div class="pill">
+      <span>HP:</span><span id="hp">100</span>
+      <span>Shield:</span><span id="shield">0</span>
+      <span>Score:</span><span id="score">0</span>
+    </div>
+    <div class="right">
+      <span class="badge" id="weapon">Blaster</span>
+      <span class="badge" id="speed">Speed: 1.0x</span>
+      <span class="badge" id="area">Sector A-1</span>
+      <span class="badge" id="fps">FPS</span>
+    </div>
+  </div>
 
-                <div id="daily-goals-list" class="grid grid-cols-1 gap-4">
-                    <!-- Daily goal tiles inserted here -->
-                </div>
-            </section>
+  <div class="controls" aria-hidden="false">
+    <div class="stick" id="stick"><div class="nub" id="nub"></div></div>
+    <div class="btn" id="fireBtn" aria-label="Fire">FIRE</div>
+  </div>
 
-            <!-- LONG-TERM GOALS PANEL -->
-            <section id="long-panel" class="bg-white p-4 rounded-2xl shadow-xl border border-gray-100">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-bold text-indigo-700">Long‑term Goals</h2>
-                    <div class="text-sm text-gray-500" id="long-subtext">Overall Progress</div>
-                </div>
+  <div class="overlay" id="pauseOverlay">
+    <div class="card">
+      <h2>Paused</h2>
+      <p>WASD / Arrow keys to move, Space to fire. On mobile, use joystick and fire button. Press P to toggle pause.</p>
+      <div class="row">
+        <span class="badge">Shield</span>
+        <span class="badge">Quicker Shot</span>
+        <span class="badge">Wide Shot</span>
+        <span class="badge">Powerful Shot</span>
+        <span class="badge">Speed Boost</span>
+        <span class="badge">Ship Upgrade</span>
+        <span class="badge">Magnet</span>
+        <span class="badge">Repair</span>
+      </div>
+      <p>Discover planets, stations, caches, and anomalies. Survive, score, and upgrade.</p>
+    </div>
+  </div>
 
-                <div id="longterm-goals-list" class="grid grid-cols-1 gap-4">
-                    <!-- Long-term goal tiles inserted here -->
-                </div>
-            </section>
-        </div>
+  <div class="notif" id="notif" style="display:none;"></div>
 
-        <!-- GOAL CREATION FORM (stays below panels) -->
-        <div id="add-goal-container" class="bg-white p-4 rounded-2xl shadow-xl border border-gray-100">
-            <div class="flex justify-between items-center mb-1 pb-1 border-b">
-                <h2 class="text-xl font-bold text-gray-800">New Goal</h2>
-                <button id="toggle-add-form" type="button" class="p-1 text-gray-600 hover:text-blue-600 rounded-full transition duration-150" aria-label="Toggle Form">
-                    <svg class="w-6 h-6 rotate-180 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
-                </button>
-            </div>
+  <script>
+  (() => {
+    // Canvas setup
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    let W = 0, H = 0, DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    function resize() {
+      W = Math.floor(window.innerWidth);
+      H = Math.floor(window.innerHeight);
+      canvas.width = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+    resize();
 
-            <div id="add-goal-form-content" class="details-container expanded">
-                <form id="add-goal-form" class="space-y-3">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div class="md:col-span-2">
-                            <label for="goal-name" class="block text-sm font-medium text-gray-700 mb-1">Goal Name</label>
-                            <input id="goal-name" type="text" placeholder="e.g., Read for 20 minutes" class="form-input w-full p-2 border border-gray-300 rounded-xl text-sm" />
-                        </div>
+    // UI elements
+    const hpEl = document.getElementById('hp');
+    const shieldEl = document.getElementById('shield');
+    const scoreEl = document.getElementById('score');
+    const weaponEl = document.getElementById('weapon');
+    const speedEl = document.getElementById('speed');
+    const areaEl = document.getElementById('area');
+    const fpsEl = document.getElementById('fps');
+    const pauseOverlay = document.getElementById('pauseOverlay');
+    const notifEl = document.getElementById('notif');
 
-                        <div>
-                            <label for="goal-type" class="block text-sm font-medium text-gray-700 mb-1">Goal Type</label>
-                            <select id="goal-type" class="form-input w-full p-2 border border-gray-300 rounded-xl text-sm">
-                                <option value="daily" selected>Daily</option>
-                                <option value="longterm">Long‑term</option>
-                            </select>
-                        </div>
-                    </div>
+    // Input state
+    const keys = new Set();
+    window.addEventListener('keydown', (e) => {
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+      if (e.key.toLowerCase() === 'p') togglePause();
+      keys.add(e.key.toLowerCase());
+    });
+    window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <div class="w-full sm:w-1/2">
-                            <label for="goal-start" class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                            <input id="goal-start" type="date" class="form-input w-full p-2 border border-gray-300 rounded-xl text-sm" />
-                        </div>
-                        <div class="w-full sm:w-1/2">
-                            <label for="goal-end" class="block text-sm font-medium text-gray-700 mb-1">Target Date</label>
-                            <input id="goal-end" type="date" class="form-input w-full p-2 border border-gray-300 rounded-xl text-sm" />
-                        </div>
-                    </div>
+    // Mobile joystick
+    const stick = document.getElementById('stick');
+    const nub = document.getElementById('nub');
+    const fireBtn = document.getElementById('fireBtn');
+    let joyActive = false, joyDX = 0, joyDY = 0;
+    function setNub(x, y) {
+      nub.style.left = (x * 50 + 50) + '%';
+      nub.style.top = (y * 50 + 50) + '%';
+    }
+    function joyReset() { joyDX = 0; joyDY = 0; setNub(0,0); }
+    stick.addEventListener('pointerdown', (e) => {
+      joyActive = true;
+      stick.setPointerCapture(e.pointerId);
+    });
+    stick.addEventListener('pointermove', (e) => {
+      if (!joyActive) return;
+      const rect = stick.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = (e.clientX - cx);
+      const dy = (e.clientY - cy);
+      const max = rect.width * 0.45;
+      const len = Math.hypot(dx, dy);
+      const nx = len > max ? dx * (max / len) : dx;
+      const ny = len > max ? dy * (max / len) : dy;
+      joyDX = nx / max;
+      joyDY = ny / max;
+      setNub(joyDX, joyDY);
+    });
+    stick.addEventListener('pointerup', (e) => { joyActive = false; joyReset(); });
+    fireBtn.addEventListener('pointerdown', () => { fireRequested = true; });
 
-                    <div class="p-3 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
-                        <div id="tasks-draft-container" class="details-container expanded">
-                            <ul id="steps-draft-list" class="space-y-1 max-h-40 overflow-y-auto pr-2"></ul>
+    // Game constants
+    const TAU = Math.PI * 2;
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const rand = (n=1) => Math.random() * n;
+    const pick = (arr) => arr[Math.floor(rand(arr.length))];
 
-                            <div class="space-y-2 pt-1 border-t border-gray-200">
-                                <div>
-                                    <label for="new-step-desc" class="block text-sm font-medium text-gray-700 mb-1">Task Description</label>
-                                    <input id="new-step-desc" type="text" placeholder="e.g., Do 20 pushups" class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm" />
-                                </div>
+    // World + player
+    const world = {
+      seed: Math.floor(Math.random() * 1e9),
+      time: 0,
+      sector: 'A-1',
+      parallax: [
+        { stars: [], count: 150, speed: 0.1, color: '#98a6d6', size: [1,2] },
+        { stars: [], count: 90, speed: 0.25, color: '#b7c5ff', size: [1,3] },
+        { stars: [], count: 60, speed: 0.45, color: '#e0ecff', size: [2,3] },
+      ],
+      pois: [] // planets/stations/anomalies
+    };
 
-                                <div class="flex space-x-3">
-                                    <div class="w-1/2">
-                                        <label for="new-step-start-date" class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                                        <input id="new-step-start-date" type="date" class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm"/>
-                                    </div>
-                                    <div class="w-1/2">
-                                        <label for="new-step-end-date" class="block text-sm font-medium text-gray-700 mb-1">Target Date</label>
-                                        <input id="new-step-end-date" type="date" class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm"/>
-                                    </div>
-                                </div>
+    // Simple seeded RNG for POIs placement
+    function sRand(seed) {
+      let x = seed ^ 0x9e3779b9;
+      return () => {
+        x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+        return (x >>> 0) / 4294967296;
+      };
+    }
+    function genPOIs() {
+      const r = sRand(world.seed);
+      const types = ['planet','station','cache','anomaly'];
+      for (let i = 0; i < 40; i++) {
+        const t = pick(types);
+        const dist = 500 + r() * 10000;
+        const ang = r() * TAU;
+        world.pois.push({
+          type: t,
+          x: Math.cos(ang) * dist,
+          y: Math.sin(ang) * dist,
+          size: 40 + r() * 80,
+          name: t.charAt(0).toUpperCase() + t.slice(1) + '-' + Math.floor(r()*999)
+        });
+      }
+    }
+    genPOIs();
 
-                                <div class="flex items-center pt-1">
-                                    <input id="new-step-recurring" type="checkbox" class="h-4 w-4 text-emerald-600 rounded toggle-step" />
-                                    <label for="new-step-recurring" class="ml-2 block text-sm font-medium text-gray-700">Daily Recurring Task</label>
-                                </div>
+    const player = {
+      x: 0, y: 0, vx: 0, vy: 0, angle: 0,
+      speed: 240, accel: 12, drag: 0.92,
+      hp: 100, shield: 0, score: 0,
+      fireCooldown: 0, weapon: 'Blaster', shotRate: 0.22,
+      shotSpeed: 600, shotDamage: 10, shotSpread: 0, shotWidth: 2,
+      magnetRadius: 0,
+      upgrades: { hull: 1, engine: 1, cannon: 1 },
+      inv: [], // active powerups with timers
+    };
 
-                                <button type="button" id="add-step-draft-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium text-sm py-2 rounded-xl transition duration-200">
-                                    Add Task
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+    // Entities
+    const bullets = [];
+    const asteroids = [];
+    const pickups = [];
 
-                    <div class="p-3 bg-gray-50 rounded-xl shadow-inner border border-gray-200 mt-3">
-                        <button type="button" id="toggle-notes" class="w-full text-left flex justify-between items-center text-sm font-bold text-gray-700 hover:text-blue-600 transition duration-150">
-                            <span>Notes</span>
-                            <svg class="w-5 h-5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                        </button>
-                        <div id="notes-container" class="details-container">
-                            <textarea id="goal-notes" rows="3" placeholder="Context or key resources..." class="notes-textarea form-input w-full p-2 border border-gray-300 rounded-xl text-sm mt-2"></textarea>
-                        </div>
-                    </div>
+    // Asteroids spawn around the player with bias forward
+    function spawnAsteroid() {
+      const biasAng = player.angle + (rand(0.7) - 0.35);
+      const dist = 600 + rand(1200);
+      const ang = pick([biasAng, biasAng + rand(0.8)-0.4, player.angle + Math.PI + rand(1)-0.5]);
+      const x = player.x + Math.cos(ang) * dist;
+      const y = player.y + Math.sin(ang) * dist;
+      const r = 16 + rand(44);
+      const speed = 40 + rand(120);
+      const dir = Math.atan2(player.y - y, player.x - x) + (rand(0.6)-0.3);
+      asteroids.push({ x, y, r, vx: Math.cos(dir)*speed, vy: Math.sin(dir)*speed, spin: (rand(2)-1)*0.02, hp: Math.max(10, r*1.2) });
+    }
 
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-lg py-3 rounded-xl transition duration-200 shadow-lg mt-4">
-                        CREATE GOAL
-                    </button>
-                </form>
-            </div>
-        </div>
+    // Power-ups registry
+    const POWERUPS = {
+      Shield: {
+        color: '#5cffb1',
+        apply: () => { player.shield = Math.min(100, player.shield + 50); notify('Shield +50'); },
+        duration: 0
+      },
+      QuickerShot: {
+        color: '#6fa8ff',
+        apply: () => { player.inv.push({ name: 'QuickerShot', t: 12, onEnd: () => {} }); player.shotRate *= 0.6; weaponEl.textContent = 'Quick Blaster'; notify('Quicker Shot'); },
+        duration: 12,
+        end: () => { player.shotRate /= 0.6; weaponEl.textContent = 'Blaster'; }
+      },
+      WideShot: {
+        color: '#b7ff6f',
+        apply: () => { player.inv.push({ name: 'WideShot', t: 12, onEnd: () => {} }); player.shotSpread += 0.18; player.shotWidth = Math.min(4, player.shotWidth+1); weaponEl.textContent = 'Wide Blaster'; notify('Wide Shot'); },
+        duration: 12,
+        end: () => { player.shotSpread -= 0.18; player.shotWidth = Math.max(2, player.shotWidth-1); weaponEl.textContent = 'Blaster'; }
+      },
+      PowerfulShot: {
+        color: '#ffcf6f',
+        apply: () => { player.inv.push({ name: 'PowerfulShot', t: 12, onEnd: () => {} }); player.shotDamage *= 1.8; weaponEl.textContent = 'Heavy Blaster'; notify('Powerful Shot'); },
+        duration: 12,
+        end: () => { player.shotDamage /= 1.8; weaponEl.textContent = 'Blaster'; }
+      },
+      SpeedBoost: {
+        color: '#ff9ef7',
+        apply: () => { player.inv.push({ name: 'SpeedBoost', t: 10, onEnd: () => {} }); player.speed *= 1.5; speedEl.textContent = `Speed: ${(player.speed/240).toFixed(1)}x`; notify('Speed Boost'); },
+        duration: 10,
+        end: () => { player.speed /= 1.5; speedEl.textContent = `Speed: ${(player.speed/240).toFixed(1)}x`; }
+      },
+      Magnet: {
+        color: '#c0ffea',
+        apply: () => { player.inv.push({ name: 'Magnet', t: 18, onEnd: () => {} }); player.magnetRadius = 240; notify('Magnet: pull rewards'); },
+        duration: 18,
+        end: () => { player.magnetRadius = 0; }
+      },
+      Repair: {
+        color: '#98ff98',
+        apply: () => { const healed = Math.min(100 - player.hp, 30); player.hp += healed; notify(`Repair +${healed} HP`); },
+        duration: 0
+      },
+      ShipUpgrade: {
+        color: '#a6a6ff',
+        apply: () => {
+          const stat = pick(['hull','engine','cannon']);
+          player.upgrades[stat] += 1;
+          if (stat === 'hull') player.hp = Math.min(100 + player.upgrades.hull*10, player.hp + 10);
+          if (stat === 'engine') player.accel *= 1.05;
+          if (stat === 'cannon') player.shotDamage *= 1.08;
+          notify(`Ship Upgrade: ${stat} v${player.upgrades[stat]}`);
+        },
+        duration: 0
+      }
+    };
 
-        <!-- CONFIRMATION MODAL -->
-        <div id="confirmation-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4" aria-modal="true" role="dialog">
-            <div id="modal-content" class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6" role="document">
-                <h3 id="modal-title" class="text-xl font-bold text-gray-800 mb-4"></h3>
-                <p id="modal-message" class="text-gray-600 mb-6"></p>
-                <div class="flex justify-end space-x-3">
-                    <button id="modal-cancel-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">Cancel</button>
-                    <button id="modal-confirm-btn" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition shadow-md">Confirm</button>
-                </div>
-            </div>
-        </div>
-    </main>
+    // Pickup spawner
+    function spawnPickup(x, y) {
+      const names = Object.keys(POWERUPS);
+      const name = pick(names);
+      pickups.push({ x, y, r: 10, name, color: POWERUPS[name].color });
+    }
 
-    <script>
-        // Local storage key
-        const LOCAL_STORAGE_KEY = 'goalTrackerData_v2';
-        let goals = [];
-        let stepsDraft = [];
+    // Projectiles
+    let fireRequested = false;
+    function fire() {
+      if (player.fireCooldown > 0) return;
+      player.fireCooldown = player.shotRate;
+      const spread = player.shotSpread;
+      const baseAng = player.angle;
+      const n = spread > 0.15 ? 3 : 1;
+      for (let i = 0; i < n; i++) {
+        const ang = baseAng + (spread ? (i - (n-1)/2) * spread : 0) + (spread ? (rand(0.04)-0.02) : 0);
+        const speed = player.shotSpeed;
+        bullets.push({
+          x: player.x + Math.cos(baseAng)*20,
+          y: player.y + Math.sin(baseAng)*20,
+          vx: Math.cos(ang)*speed + player.vx*0.25,
+          vy: Math.sin(ang)*speed + player.vy*0.25,
+          life: 1.4,
+          w: player.shotWidth,
+          dmg: player.shotDamage,
+        });
+      }
+    }
 
-        const loadGoals = () => {
-            const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-            goals = data ? JSON.parse(data) : [];
-        };
+    // Collision helpers
+    function circleHit(ax, ay, ar, bx, by, br) {
+      return (ax-bx)**2 + (ay-by)**2 <= (ar+br)**2;
+    }
 
-        const saveGoals = () => {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(goals));
-            renderGoals();
-        };
+    // Notifications
+    let notifTimer = 0;
+    function notify(msg) {
+      notifEl.textContent = msg;
+      notifEl.style.display = 'block';
+      notifTimer = 2.2;
+    }
 
-        const generateId = () => {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-        };
+    // Pause
+    let paused = false;
+    function togglePause() {
+      paused = !paused;
+      pauseOverlay.classList.toggle('active', paused);
+    }
 
-        const formatDate = (dateString) => {
-            if (!dateString) return 'N/A';
-            const parts = dateString.split('-');
-            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-            return dateString;
-        };
-
-        const getTodayDateString = () => new Date().toISOString().slice(0,10);
-
-        const showStatusMessage = (msg) => console.warn('STATUS:', msg);
-
-        const calculateProgress = (goal) => {
-            const totalSteps = goal.steps.length;
-            const today = getTodayDateString();
-
-            if (totalSteps === 0) return { progressPercent: 0, completedToday: 0, totalSteps: 0 };
-
-            const completedToday = goal.steps.reduce((count, step) => {
-                const isDoneToday = step.isRecurring
-                    ? (step.completionLog && step.completionLog.includes(today))
-                    : step.isCompleted;
-                return count + (isDoneToday ? 1 : 0);
-            }, 0);
-
-            if (goal.type === 'daily') {
-                const progressPercent = Math.round((completedToday / totalSteps) * 100);
-                return { progressPercent, completedToday, totalSteps };
-            } else { // longterm
-                const nonRecurring = goal.steps.filter(s => !s.isRecurring);
-                if (nonRecurring.length > 0) {
-                    const completedNonRecurring = nonRecurring.reduce((c, s) => c + (s.isCompleted ? 1 : 0), 0);
-                    const progressPercent = Math.round((completedNonRecurring / nonRecurring.length) * 100);
-                    return { progressPercent, completedToday, totalSteps: nonRecurring.length, completedNonRecurring };
-                } else {
-                    const progressPercent = Math.round((completedToday / totalSteps) * 100);
-                    return { progressPercent, completedToday, totalSteps };
-                }
-            }
-        };
-
-        // RENDERING
-        const renderGoals = () => {
-            const dailyContainer = document.getElementById('daily-goals-list');
-            const longContainer = document.getElementById('longterm-goals-list');
-            dailyContainer.innerHTML = '';
-            longContainer.innerHTML = '';
-
-            const dailyGoals = goals.filter(g => g.type === 'daily');
-            const longGoals = goals.filter(g => g.type === 'longterm');
-
-            document.getElementById('summary-daily-count').textContent = dailyGoals.length;
-            document.getElementById('summary-long-count').textContent = longGoals.length;
-
-            const dailyTotals = dailyGoals.reduce((acc, g) => {
-                const p = calculateProgress(g);
-                acc.completed += p.completedToday || 0;
-                acc.total += (p.totalSteps || g.steps.length);
-                return acc;
-            }, {completed: 0, total: 0});
-            document.getElementById('daily-today-completed').textContent = dailyTotals.completed;
-            document.getElementById('daily-today-total').textContent = dailyTotals.total;
-
-            if (dailyGoals.length === 0) {
-                dailyContainer.innerHTML = `
-                    <div class="p-8 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-center text-gray-500">
-                        No daily goals yet — create one below.
-                    </div>
-                `;
-            } else {
-                dailyGoals.forEach(g => dailyContainer.appendChild(createGoalElement(g)));
-            }
-
-            if (longGoals.length === 0) {
-                longContainer.innerHTML = `
-                    <div class="p-8 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-center text-gray-500">
-                        No long‑term goals yet — create one below.
-                    </div>
-                `;
-            } else {
-                longGoals.forEach(g => longContainer.appendChild(createGoalElement(g)));
-            }
-        };
-
-        const renderStepDatesHtml = (step) => {
-            return (step.startDate || step.endDate) ? `<div class="text-xs text-gray-400 mt-1">Start: ${formatDate(step.startDate)} · Target: ${formatDate(step.endDate)}</div>` : '';
-        };
-
-        const createGoalElement = (goal) => {
-            const { progressPercent, completedToday, totalSteps } = calculateProgress(goal);
-            const isCompleted = progressPercent === 100;
-            const today = getTodayDateString();
-            const color = goal.type === 'daily' ? 'emerald' : 'indigo';
-            const tile = document.createElement('div');
-
-            tile.className = `goal-tile p-4 rounded-xl border-t-4 border-${color}-500 bg-white shadow-lg flex flex-col justify-between`;
-            tile.setAttribute('data-goal-id', goal.id);
-
-            const stepsHtml = goal.steps.length > 0 ? goal.steps.map(step => {
-                const isDoneToday = step.isRecurring
-                    ? (step.completionLog && step.completionLog.includes(today))
-                    : step.isCompleted;
-                const recurringTag = step.isRecurring ? `<span class="text-xs font-semibold text-${color}-600 bg-${color}-100 px-2 py-0.5 rounded-full ml-2">Daily</span>` : '';
-                return `
-                    <li data-step-id="${step.id}" data-goal-id="${goal.id}" class="flex items-start p-2 bg-gray-50 rounded-lg border border-gray-100 mb-1">
-                        <input type="checkbox" ${isDoneToday ? 'checked' : ''} class="step-checkbox toggle-step h-4 w-4 text-emerald-600 mt-1 mr-3" />
-                        <div class="text-sm min-w-0">
-                            <div class="${isDoneToday ? 'line-through text-gray-400' : 'text-gray-700'} font-medium">${step.description} ${recurringTag}</div>
-                            ${renderStepDatesHtml(step)}
-                        </div>
-                    </li>
-                `;
-            }).join('') : '<div class="text-sm text-gray-500 italic">No tasks yet.</div>';
-
-            const isExpanded = !!goal.isExpanded;
-
-            tile.innerHTML = `
-                <div class="flex items-start justify-between">
-                    <div class="flex-1 pr-3">
-                        <div class="flex items-center gap-2">
-                            <h3 class="text-lg font-bold text-gray-800 truncate ${isCompleted ? 'line-through text-gray-500' : ''}">${goal.name}</h3>
-                            <span class="text-xs font-medium text-${color}-700 bg-${color}-100 px-2 py-0.5 rounded-full">${goal.type === 'daily' ? 'Daily' : 'Long'}</span>
-                        </div>
-                        <p class="text-xs text-gray-500 mt-1">Start: ${formatDate(goal.startDate)} • Target: ${formatDate(goal.endDate)}</p>
-                    </div>
-
-                    <div class="flex flex-col items-end justify-between">
-                        <div class="text-sm text-gray-500">${completedToday}/${totalSteps}</div>
-                        <div class="kpi-big text-${color}-600 font-extrabold">${progressPercent}%</div>
-                    </div>
-                </div>
-
-                <div class="mt-3 tile-scroll">
-                    <h4 class="text-sm font-semibold text-gray-700 mb-2">Tasks</h4>
-                    <ul class="mb-2">
-                        ${stepsHtml}
-                    </ul>
-                </div>
-
-                <div class="mt-3">
-                    <div class="goal-details-content details-container ${isExpanded ? 'expanded' : ''}">
-                        <div class="mb-3 p-3 bg-white rounded-xl space-y-3 shadow-sm border border-gray-200">
-                            <button type="button" class="toggle-details-btn w-full text-left flex justify-between items-center text-sm font-bold text-gray-700 hover:text-blue-600 transition duration-150">
-                                <span>+ Add New Task</span>
-                                <svg class="w-4 h-4 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                            </button>
-                            <div class="add-task-form details-container">
-                                <div class="space-y-3 pt-1">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">Task Description</label>
-                                        <input data-new-task-desc type="text" class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g., Write 500 words"/>
-                                    </div>
-                                    <div class="flex space-x-3">
-                                        <div class="w-1/2">
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                                            <input data-new-task-start type="date" class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm"/>
-                                        </div>
-                                        <div class="w-1/2">
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">Target Date</label>
-                                            <input data-new-task-end type="date" class="form-input w-full p-2 border border-gray-300 rounded-lg text-sm"/>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center">
-                                        <input data-new-task-rec type="checkbox" class="h-4 w-4 text-emerald-600 rounded toggle-step" />
-                                        <label class="ml-2 text-sm text-gray-700">Daily Recurring Task</label>
-                                    </div>
-                                    <button type="button" class="add-task-btn w-full bg-${color}-600 hover:bg-${color}-700 text-white py-2 rounded-lg text-sm">Add Task</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="p-3 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
-                            <button type="button" class="toggle-details-btn w-full text-left flex justify-between items-center text-sm font-bold text-gray-700 hover:text-blue-600 transition duration-150">
-                                <span>Notes</span>
-                                <svg class="w-4 h-4 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                            </button>
-                            <div class="goal-notes-content details-container mt-2">
-                                <div class="pt-2">
-                                    <h4 class="text-sm font-semibold text-gray-700 flex justify-between items-center mb-1">Goal Notes
-                                        <button data-edit-notes class="edit-notes-btn text-xs text-${color}-600 hover:text-${color}-800">Edit</button>
-                                    </h4>
-                                    <div class="notes-display text-sm text-gray-600 whitespace-pre-wrap px-1">${goal.notes || 'No notes added.'}</div>
-                                    <div class="notes-edit hidden mt-2">
-                                        <textarea class="notes-textarea w-full p-2 border border-${color}-300 rounded-lg text-sm focus:ring-${color}-500 focus:border-${color}-500 transition"></textarea>
-                                        <div class="flex justify-end space-x-2 mt-2">
-                                            <button data-cancel-notes class="px-3 py-1 text-sm font-medium text-gray-700 bg-white rounded-lg border border-gray-300">Cancel</button>
-                                            <button data-save-notes class="px-3 py-1 text-sm font-medium text-white bg-${color}-600 rounded-lg">Save</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-3">
-                            <button data-delete-goal class="w-full text-red-600 hover:bg-red-50 text-sm font-semibold py-2 rounded-xl border border-red-100">Delete Goal</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // after creating element attach the behaviors so we don't rely on inline handlerseturn tile;
-        };
-
-        function attachTileListeners(tile, goal) {
-            const goalId = goal.id;
-            // step checkboxes
-            tile.querySelectorAll('.step-checkbox').forEach(cb => {
-                cb.addEventListener('change', (e) => {
-                    const li = e.target.closest('li');
-                    const stepId = li && li.getAttribute('data-step-id');
-                    if (stepId) handleToggleStep(goalId, stepId, e.target.checked);
-                });
-            });
-
-            // toggles for nested details (Add Task / Notes)
-            tile.querySelectorAll('.toggle-details-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const content = btn.nextElementSibling;
-                    if (!content) return;
-                    content.classList.toggle('expanded');
-                    const svg = btn.querySelector('svg');
-                    if (svg) svg.classList.toggle('rotate-180');
-                });
-            });
-
-            // add task button
-            const addBtn = tile.querySelector('.add-task-btn');
-            if (addBtn) {
-                addBtn.addEventListener('click', () => {
-                    const container = addBtn.closest('.add-task-form');
-                    const descEl = container.querySelector('[data-new-task-desc]');
-                    const startEl = container.querySelector('[data-new-task-start]');
-                    const endEl = container.querySelector('[data-new-task-end]');
-                    const recEl = container.querySelector('[data-new-task-rec]');
-                    const description = descEl ? descEl.value.trim() : '';
-                    if (!description) { showStatusMessage('Task description is required!'); return; }
-                    handleAddStep(goalId, { description, startDate: startEl ? startEl.value : '', endDate: endEl ? endEl.value : '', isRecurring: recEl ? recEl.checked : false });
-                    // clear inputs
-                    if (descEl) descEl.value = ''; if (startEl) startEl.value = ''; if (endEl) endEl.value = ''; if (recEl) recEl.checked = false;
-                });
-            }
-
-            // notes edit/save/cancel
-            const editBtn = tile.querySelector('[data-edit-notes]');
-            if (editBtn) {
-                editBtn.addEventListener('click', () => {
-                    const wrapper = tile.querySelector('.goal-notes-content .pt-2');
-                    const notesDisplay = wrapper.querySelector('.notes-display');
-                    const notesEdit = wrapper.querySelector('.notes-edit');
-                    const textarea = notesEdit.querySelector('.notes-textarea');
-                    const isEditing = !notesEdit.classList.contains('hidden');
-                    if (isEditing) {
-                        notesDisplay.classList.remove('hidden'); notesEdit.classList.add('hidden'); editBtn.textContent = 'Edit';
-                    } else {
-                        const g = goals.find(x => x.id === goalId);
-                        if (g) textarea.value = g.notes || '';
-                        notesDisplay.classList.add('hidden'); notesEdit.classList.remove('hidden'); editBtn.textContent = 'Editing...';
-                    }
-                });
-            }
-
-            const saveBtn = tile.querySelector('[data-save-notes]');
-            if (saveBtn) saveBtn.addEventListener('click', () => {
-                const notesEdit = tile.querySelector('.notes-edit');
-                const textarea = notesEdit.querySelector('.notes-textarea');
-                handleSaveNotes(goalId, textarea.value);
-            });
-            const cancelBtn = tile.querySelector('[data-cancel-notes]');
-            if (cancelBtn) cancelBtn.addEventListener('click', () => {
-                const editBtnLocal = tile.querySelector('[data-edit-notes]');
-                if (editBtnLocal) editBtnLocal.click();
-            });
-
-            // delete
-            const del = tile.querySelector('[data-delete-goal]');
-            if (del) del.addEventListener('click', () => showDeleteModal(goalId, goal.name));
+    // Initialize parallax stars
+    function initStars() {
+      world.parallax.forEach(layer => {
+        layer.stars.length = 0;
+        for (let i = 0; i < layer.count; i++) {
+          layer.stars.push({
+            x: rand(W), y: rand(H),
+            s: Math.floor(layer.size[0] + rand(layer.size[1]-layer.size[0])),
+          });
         }
+      });
+    }
+    initStars();
 
-        // HANDLERS updated to accept params for adding a step so we don't query global ids repeatedlyeturn tile;
-        // Other script logic continues here...
-        // Initialization & event listeners...
-    </script>
+    // Main loop
+    let last = performance.now(), fpsAcc = 0, fpsFrames = 0, fps = 0;
+    function loop(now) {
+      requestAnimationFrame(loop);
+      const dt = Math.min(0.033, (now - last) / 1000);
+      last = now;
+      if (paused) return;
+
+      world.time += dt;
+      fpsAcc += dt; fpsFrames++;
+      if (fpsAcc >= 0.5) { fps = Math.round(fpsFrames / fpsAcc); fpsAcc = 0; fpsFrames = 0; fpsEl.textContent = `FPS: ${fps}`; }
+
+      // Input
+      const up = keys.has('arrowup') || keys.has('w') || joyDY < -0.15;
+      const down = keys.has('arrowdown') || keys.has('s') || joyDY > 0.15;
+      const left = keys.has('arrowleft') || keys.has('a') || joyDX < -0.15;
+      const right = keys.has('arrowright') || keys.has('d') || joyDX > 0.15;
+      const shooting = keys.has(' ') || fireRequested;
+
+      const ax = (right - left) * player.accel;
+      const ay = (down - up) * player.accel;
+      player.vx += ax; player.vy += ay;
+
+      // Cap speed
+      const maxV = player.speed;
+      const vLen = Math.hypot(player.vx, player.vy);
+      if (vLen > maxV) {
+        const k = maxV / vLen; player.vx *= k; player.vy *= k;
+      }
+      // Drag
+      player.vx *= player.drag; player.vy *= player.drag;
+      player.x += player.vx * dt * 60 * 0.016; // scale to roughly consistent feel across FPS
+      player.y += player.vy * dt * 60 * 0.016;
+
+      // Aim angle towards movement or mouse? Here: based on movement
+      if (vLen > 5) player.angle = Math.atan2(player.vy, player.vx);
+
+      // Fire
+      player.fireCooldown = Math.max(0, player.fireCooldown - dt);
+      if (shooting) { fire(); fireRequested = false; }
+
+      // Update bullets
+      for (let i = bullets.length-1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        b.life -= dt;
+        if (b.life <= 0) bullets.splice(i,1);
+      }
+
+      // Spawn asteroids
+      if (asteroids.length < 28 && Math.random() < 0.25) spawnAsteroid();
+
+      // Update asteroids
+      for (let i = asteroids.length-1; i >= 0; i--) {
+        const a = asteroids[i];
+        a.x += a.vx * dt; a.y += a.vy * dt;
+        a.spin += (Math.random()-0.5)*0.001;
+        // Bullet hits
+        for (let j = bullets.length-1; j >= 0; j--) {
+          const b = bullets[j];
+          if (circleHit(a.x,a.y,a.r, b.x,b.y, 2)) {
+            a.hp -= b.dmg; bullets.splice(j,1);
+            if (a.hp <= 0) {
+              // Asteroid destroyed
+              player.score += Math.round(10 + a.r);
+              spawnPickup(a.x, a.y);
+              asteroids.splice(i,1);
+              break;
+            }
+          }
+        }
+        // Player collision
+        if (circleHit(a.x, a.y, a.r, player.x, player.y, 14)) {
+          const dmg = Math.round(10 + a.r*0.25);
+          if (player.shield > 0) {
+            const absorb = Math.min(player.shield, dmg);
+            player.shield -= absorb;
+            const spill = dmg - absorb;
+            if (spill > 0) player.hp -= spill;
+          } else {
+            player.hp -= dmg;
+          }
+          a.vx *= -0.8; a.vy *= -0.8;
+          if (player.hp <= 0) {
+            notify('Ship destroyed. Press R to respawn.');
+            paused = true; pauseOverlay.classList.add('active');
+          }
+        }
+      }
+
+      // Update pickups (magnet + collect)
+      for (let i = pickups.length-1; i >= 0; i--) {
+        const p = pickups[i];
+        const dx = player.x - p.x, dy = player.y - p.y;
+        const d = Math.hypot(dx, dy);
+        if (player.magnetRadius && d < player.magnetRadius) {
+          const f = clamp(240 / (d+1), 0.2, 8);
+          p.x += dx * dt * f; p.y += dy * dt * f;
+        }
+        if (d < 20) {
+          const pu = POWERUPS[p.name];
+          pu.apply();
+          if (pu.duration && pu.end) {
+            // ensure unique effect not stacked multiply on simultaneous re-pickup
+            // handled by timer system below
+          }
+          pickups.splice(i,1);
+        }
+      }
+
+      // Timers: active powerups
+      for (let i = player.inv.length-1; i >= 0; i--) {
+        const it = player.inv[i];
+        it.t -= dt;
+        if (it.t <= 0) {
+          // end effect where necessary
+          const def = POWERUPS[it.name];
+          if (def && def.end) def.end();
+          player.inv.splice(i,1);
+        }
+      }
+
+      // Parallax starfield moves opposite player velocity
+      ctx.fillStyle = '#060a16';
+      ctx.fillRect(0,0,W,H);
+      world.parallax.forEach(layer => {
+        ctx.fillStyle = layer.color;
+        const ox = -player.vx * layer.speed * dt;
+        const oy = -player.vy * layer.speed * dt;
+        for (const s of layer.stars) {
+          s.x += ox; s.y += oy;
+          if (s.x < 0) s.x += W; if (s.x >= W) s.x -= W;
+          if (s.y < 0) s.y += H; if (s.y >= H) s.y -= H;
+          ctx.fillRect(s.x|0, s.y|0, s.s, s.s);
+        }
+      });
+
+      // World to screen transform
+      function toScreen(x,y) { return { x: x - player.x + W/2, y: y - player.y + H/2 }; }
+
+      // Draw POIs (planets/stations)
+      for (const p of world.pois) {
+        const s = toScreen(p.x, p.y);
+        if (s.x < -200 || s.y < -200 || s.x > W+200 || s.y > H+200) continue;
+        if (p.type === 'planet' || p.type === 'anomaly') {
+          const grad = ctx.createRadialGradient(s.x, s.y, 5, s.x, s.y, p.size);
+          grad.addColorStop(0, 'rgba(180,190,255,0.45)');
+          grad.addColorStop(1, 'rgba(140,150,220,0.1)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, p.size, 0, TAU);
+          ctx.fill();
+        } else if (p.type === 'station' || p.type === 'cache') {
+          ctx.strokeStyle = 'rgba(200,220,255,0.6)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(s.x - 18, s.y - 18, 36, 36);
+          ctx.fillStyle = 'rgba(150,200,255,0.15)';
+          ctx.fillRect(s.x - 18, s.y - 18, 36, 36);
+        }
+        // Label if close
+        const d = Math.hypot(player.x - p.x, player.y - p.y);
+        if (d < 900) {
+          ctx.fillStyle = 'rgba(200,220,255,0.8)';
+          ctx.font = '12px sans-serif';
+          ctx.fillText(`${p.name} (${p.type})`, s.x + 10, s.y - 10);
+        }
+      }
+
+      // Draw pickups
+      for (const p of pickups) {
+        const s = toScreen(p.x, p.y);
+        if (s.x < -40 || s.y < -40 || s.x > W+40 || s.y > H+40) continue;
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 8, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1; ctx.stroke();
+      }
+
+      // Draw asteroids
+      for (const a of asteroids) {
+        const s = toScreen(a.x, a.y);
+        if (s.x < -a.r-20 || s.y < -a.r-20 || s.x > W+a.r+20 || s.y > H+a.r+20) continue;
+        ctx.fillStyle = '#3a415c';
+        ctx.beginPath(); ctx.arc(s.x, s.y, a.r, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 2; ctx.stroke();
+      }
+
+      // Draw bullets
+      ctx.strokeStyle = '#b7c5ff';
+      for (const b of bullets) {
+        const s = toScreen(b.x, b.y);
+        ctx.lineWidth = b.w;
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y);
+        ctx.lineTo(s.x - Math.cos(player.angle)*8, s.y - Math.sin(player.angle)*8);
+        ctx.stroke();
+      }
+
+      // Draw player ship
+      const px = W/2, py = H/2;
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(player.angle);
+      // Body
+      ctx.fillStyle = '#7fb0ff';
+      ctx.beginPath();
+      ctx.moveTo(18, 0);
+      ctx.lineTo(-12, -10);
+      ctx.lineTo(-6, 0);
+      ctx.lineTo(-12, 10);
+      ctx.closePath();
+      ctx.fill();
+      // Shield
+      if (player.shield > 0) {
+        const alpha = clamp(player.shield / 100, 0.2, 0.7);
+        ctx.strokeStyle = `rgba(92,255,177,${alpha})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0,0, 16, 0, TAU);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // HUD update
+      hpEl.textContent = Math.max(0, Math.round(player.hp));
+      shieldEl.textContent = Math.round(player.shield);
+      scoreEl.textContent = player.score;
+      speedEl.textContent = `Speed: ${(player.speed/240).toFixed(1)}x`;
+      areaEl.textContent = `Sector ${world.sector}`;
+
+      // Notification timer
+      if (notifTimer > 0) {
+        notifTimer -= dt;
+        if (notifTimer <= 0) notifEl.style.display = 'none';
+      }
+    }
+    requestAnimationFrame(loop);
+
+    // Respawn
+    window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'r') {
+        player.hp = 100; player.shield = 0; player.x = 0; player.y = 0;
+        player.vx = 0; player.vy = 0; player.inv.length = 0;
+        asteroids.length = 0; bullets.length = 0; pickups.length = 0;
+        paused = false; pauseOverlay.classList.remove('active');
+        notify('Respawned');
+      }
+    });
+
+    // Focus management: pause when tab not visible
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { if (!paused) togglePause(); }
+    });
+
+    // Install prompt notice (PWA-lite hint)
+    window.addEventListener('load', () => {
+      // Light touch only; full PWA would add manifest/service worker.
+      notify('Tip: Add to Home Screen for full-screen play.');
+      setTimeout(() => { if (notifEl.style.display !== 'none') notifEl.style.display = 'none'; }, 4000);
+    });
+
+  })();
+  </script>
 </body>
 </html>
