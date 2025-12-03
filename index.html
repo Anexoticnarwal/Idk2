@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,11 +6,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>Star Drift</title>
 <style>
-  :root { color-scheme: dark; --bg:#0a0f1e; --fg:#cfe0ff; --hud:rgba(255,255,255,0.08); }
+  :root { color-scheme: dark; --bg:#0a0f1e; --fg:#b5c7ff; --hud:rgba(255,255,255,0.08); }
   html, body { margin:0; padding:0; background:var(--bg); height:100%; overflow:hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
   #game { display:block; width:100vw; height:100vh; touch-action:none; }
 
-  .hud { position:fixed; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center; padding:8px 10px; color:var(--fg); font-size:14px; background:linear-gradient(to bottom, rgba(0,0,0,0.35), transparent); z-index:10; }
+  .hud { position:fixed; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center;
+    padding:8px 10px; color:var(--fg); font-size:14px; background:linear-gradient(to bottom, rgba(0,0,0,0.35), transparent); z-index:10; }
   .hud .pill { background:var(--hud); border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:6px 10px; display:inline-flex; gap:10px; align-items:center; }
   .hud .right { display:flex; align-items:center; gap:8px; }
   .badge { display:inline-block; padding:2px 6px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); font-size:12px; }
@@ -88,12 +90,10 @@
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    initStars();
   }
-  addEventListener('resize', resize);
-  resize();
+  addEventListener('resize', resize); resize();
 
-  // UI refs
+  // UI
   const hpEl = document.getElementById('hp');
   const shieldEl = document.getElementById('shield');
   const scoreEl = document.getElementById('score');
@@ -150,15 +150,15 @@
 
   // Parallax stars
   const parallax = [
-    { stars: [], count: 160, speed: 0.08, color: '#98a6d6' },
-    { stars: [], count: 110, speed: 0.20, color: '#b7c5ff' },
-    { stars: [], count: 80, speed: 0.40, color: '#e0ecff' }
+    { stars: [], count: 140, speed: 0.08, color: '#98a6d6' },
+    { stars: [], count: 90, speed: 0.20, color: '#b7c5ff' },
+    { stars: [], count: 60, speed: 0.40, color: '#e0ecff' }
   ];
   function initStars() {
     parallax.forEach(layer => {
       layer.stars.length = 0;
       for (let i = 0; i < layer.count; i++) {
-        layer.stars.push({ x: Math.random() * W, y: Math.random() * H });
+        layer.stars.push({ x: rand(W), y: rand(H) });
       }
     });
   }
@@ -166,7 +166,7 @@
 
   // Planets
   const planets = [];
-  function genPlanets(count = 18) {
+  function genPlanets(count = 20) {
     planets.length = 0;
     for (let i = 0; i < count; i++) {
       const ang = rand(TAU), dist = 1600 + rand(20000);
@@ -186,10 +186,10 @@
   // Player
   const player = {
     x: 0, y: 0, vx: 0, vy: 0, angle: 0,
-    speed: 330, accel: 24, drag: 0.90,
+    speed: 320, accel: 22, drag: 0.90,
     hp: 100, shield: 0, score: 0, credits: 0,
     fireCooldown: 0, shotRate: 0.13,
-    shotSpeed: 700, shotDamage: 10, shotWidth: 2,
+    shotSpeed: 680, shotDamage: 10, shotWidth: 2,
     inSafeZone: false
   };
 
@@ -212,14 +212,13 @@
 
   // Asteroids
   function spawnAsteroid(level = waveLevel) {
-    // Spawn within a visible ring around the screen center to avoid immediate off-screen respawn
-    const dist = 300 + rand(220); // closer so they appear right away
+    const dist = 760 + rand(960);
     const ang = rand(TAU);
     const x = player.x + Math.cos(ang) * dist;
     const y = player.y + Math.sin(ang) * dist;
     const r = 22 + rand(24) + level * 0.6;
     const hp = Math.round(24 + level * 6 + rand(16));
-    const speed = 120 + level * 5 + rand(30);
+    const speed = 110 + level * 5 + rand(30);
     const dir = Math.atan2(player.y - y, player.x - x);
     asteroids.push({
       x, y, r, hp,
@@ -244,12 +243,12 @@
   function fire() {
     if (player.fireCooldown > 0) return;
     player.fireCooldown = player.shotRate;
-    const ang = player.angle;
+    const baseAng = player.angle;
     bullets.push({
-      x: player.x + Math.cos(ang)*18,
-      y: player.y + Math.sin(ang)*18,
-      vx: Math.cos(ang)*player.shotSpeed + player.vx*0.25,
-      vy: Math.sin(ang)*player.shotSpeed + player.vy*0.25,
+      x: player.x + Math.cos(baseAng)*18,
+      y: player.y + Math.sin(baseAng)*18,
+      vx: Math.cos(baseAng)*player.shotSpeed + player.vx*0.25,
+      vy: Math.sin(baseAng)*player.shotSpeed + player.vy*0.25,
       life: 1.2,
       w: player.shotWidth,
       dmg: player.shotDamage
@@ -287,9 +286,9 @@
   btnDamage.addEventListener('click', () => { tryBuy(cost(12, 2), () => { player.shotDamage += (1 + Math.floor(waveLevel/12)); }); });
   btnRepair.addEventListener('click', () => { tryBuy(cost(8, 1), () => { player.hp = 100; }); });
 
-  // Steering smoothing (snappy)
+  // Steering smoothing (responsive)
   function smoothAnalog(dt) {
-    const lerp = 1 - Math.exp(-30 * dt);
+    const lerp = 1 - Math.exp(-28 * dt);
     joyVX += (joyDX - joyVX) * lerp;
     joyVY += (joyDY - joyVY) * lerp;
   }
@@ -297,9 +296,7 @@
   // Drawing helpers
   function drawAsteroid(a) {
     const s = toScreen(a.x, a.y);
-    // Only skip when far off-screen (big margin prevents flicker)
-    const margin = 200;
-    if (s.x < -margin || s.x > W + margin || s.y < -margin || s.y > H + margin) return;
+    if (s.x < -a.r-40 || s.x > W+a.r+40 || s.y < -a.r-40 || s.y > H+a.r+40) return;
     ctx.fillStyle = '#3e455d';
     ctx.beginPath();
     const pts = a.shape;
@@ -324,7 +321,7 @@
     shieldEl.textContent = Math.round(player.shield);
     scoreEl.textContent = player.score;
     creditsEl.textContent = player.credits;
-    speedEl.textContent = `Speed: ${(player.speed/330).toFixed(1)}x`;
+    speedEl.textContent = `Speed: ${(player.speed/320).toFixed(1)}x`;
     weaponEl.textContent = 'Blaster';
   }
 
@@ -406,7 +403,7 @@
       }
     });
 
-    // Reset safe zone and draw planets
+    // Reset safe zone before planets
     player.inSafeZone = false;
     for (const p of planets) drawPlanet(p);
 
@@ -419,19 +416,26 @@
       }
     }
 
-    // Asteroids update + collisions + off-screen handling
+    // Asteroids updates
     if (!paused) {
       for (let i = asteroids.length-1; i >= 0; i--) {
         const a = asteroids[i];
         a.x += a.vx * dt; a.y += a.vy * dt;
 
-        // Off-screen: gently wrap into view (avoid constant respawn loops)
+        // Off-screen: respawn around player and re-aim
         const scr = toScreen(a.x, a.y);
-        const wrapMargin = 220;
-        if (scr.x < -wrapMargin) a.x += (W + wrapMargin);
-        if (scr.x > W + wrapMargin) a.x -= (W + wrapMargin);
-        if (scr.y < -wrapMargin) a.y += (H + wrapMargin);
-        if (scr.y > H + wrapMargin) a.y -= (H + wrapMargin);
+        const margin = 80;
+        if (scr.x < -margin || scr.x > W + margin || scr.y < -margin || scr.y > H + margin) {
+          const dist = 700 + rand(500);
+          const ang = rand(TAU);
+          a.x = player.x + Math.cos(ang) * dist;
+          a.y = player.y + Math.sin(ang) * dist;
+          const dir = Math.atan2(player.y - a.y, player.x - a.x);
+          const speed = Math.hypot(a.vx, a.vy) || (110 + waveLevel * 5);
+          a.vx = Math.cos(dir) * speed;
+          a.vy = Math.sin(dir) * speed;
+          continue;
+        }
 
         // Bullet hits
         for (let j = bullets.length-1; j >= 0; j--) {
@@ -472,7 +476,7 @@
 
       // Maintain wave pressure
       const desired = 10 + (waveLevel - 1) * 4;
-      if (asteroids.length < Math.floor(desired * 0.5)) {
+      if (asteroids.length < Math.floor(desired * 0.4)) {
         const add = Math.min(6, desired - asteroids.length);
         for (let i = 0; i < add; i++) spawnAsteroid();
       }
@@ -493,7 +497,7 @@
       if (p.life <= 0) particles.splice(i,1);
     }
 
-    // Bullets render
+    // Bullets
     ctx.strokeStyle = '#b7c5ff';
     for (const b of bullets) {
       const s = toScreen(b.x, b.y);
@@ -540,7 +544,7 @@
     updateHUD();
   }
 
-  // Start game
+  // Start correctly: init stars, generate planets, start wave, then start loop
   startWave(waveLevel);
   requestAnimationFrame(loop);
 
