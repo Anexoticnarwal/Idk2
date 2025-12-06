@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Star Drift</title>
+<title>Star Drift (Enhanced)</title>
 <style>
   :root { color-scheme: dark; --bg:#0a0f1e; --fg:#b5c7ff; --hud:rgba(255,255,255,0.08); }
   html, body { margin:0; padding:0; background:var(--bg); height:100%; overflow:hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
@@ -78,7 +77,7 @@
 
 <script>
 (() => {
-  // Canvas
+  // --- Setup & Helpers ---
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d', { alpha: false });
   let W = 0, H = 0, DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -93,28 +92,40 @@
   }
   addEventListener('resize', resize); resize();
 
-  // UI
-  const hpEl = document.getElementById('hp');
-  const shieldEl = document.getElementById('shield');
-  const scoreEl = document.getElementById('score');
-  const waveEl = document.getElementById('wave');
-  const creditsEl = document.getElementById('credits');
-  const weaponEl = document.getElementById('weapon');
-  const speedEl = document.getElementById('speed');
-  const fpsEl = document.getElementById('fps');
-  const notifEl = document.getElementById('notif');
+  const TAU = Math.PI * 2;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rand = (n=1) => Math.random() * n;
+  function toScreen(x,y) { return { x: x - player.x + W/2, y: y - player.y + H/2 }; }
 
-  const planetOverlay = document.getElementById('planetOverlay');
-  const shopCredits = document.getElementById('shopCredits');
-  const shopWave = document.getElementById('shopWave');
-  const btnDamage = document.getElementById('buyDamage');
-  const btnRepair = document.getElementById('buyRepair');
-  const btnClose = document.getElementById('closeShop');
+  // Angular interpolation helper
+  function lerpAngle(a1, a2, t) {
+    let diff = a2 - a1;
+    if (diff > Math.PI) diff -= TAU;
+    if (diff < -Math.PI) diff += TAU;
+    return a1 + diff * t;
+  }
 
-  // Input
+  // --- Entity Base Class ---
+  class Entity {
+    constructor(x, y, vx, vy, life) {
+      this.x = x; this.y = y;
+      this.vx = vx; this.vy = vy;
+      this.life = life;
+    }
+    update(dt) {
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+      if (this.life !== undefined) this.life -= dt;
+    }
+    isAlive() {
+      return this.life === undefined || this.life > 0;
+    }
+  }
+
+  // --- Input ---
   const keys = new Set();
   addEventListener('keydown', (e) => {
-    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d',' '].includes(e.key.toLowerCase())) e.preventDefault();
     if (e.key === 'Escape') unpauseFromPlanet();
     keys.add(e.key.toLowerCase());
   });
@@ -143,12 +154,13 @@
   fireBtn.addEventListener('pointerdown', () => { fireHeld = true; });
   fireBtn.addEventListener('pointerup', () => { fireHeld = false; });
 
-  // Helpers
-  const TAU = Math.PI * 2;
-  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const rand = (n=1) => Math.random() * n;
+  function smoothAnalog(dt) {
+    const lerp = 1 - Math.exp(-28 * dt);
+    joyVX += (joyDX - joyVX) * lerp;
+    joyVY += (joyDY - joyVY) * lerp;
+  }
 
-  // Parallax stars
+  // --- Game Objects ---
   const parallax = [
     { stars: [], count: 140, speed: 0.08, color: '#98a6d6' },
     { stars: [], count: 90, speed: 0.20, color: '#b7c5ff' },
@@ -164,7 +176,6 @@
   }
   initStars();
 
-  // Planets
   const planets = [];
   function genPlanets(count = 20) {
     planets.length = 0;
@@ -172,61 +183,31 @@
       const ang = rand(TAU), dist = 1600 + rand(20000);
       const size = 60 + rand(60);
       planets.push({
-        x: Math.cos(ang)*dist,
-        y: Math.sin(ang)*dist,
-        size,
-        hue: Math.floor(rand(360)),
-        safeRadius: size + 140,
+        x: Math.cos(ang)*dist, y: Math.sin(ang)*dist, size,
+        hue: Math.floor(rand(360)), safeRadius: size + 140,
         name: 'Planet-' + (i+1)
       });
     }
   }
   genPlanets();
 
-  // Player
   const player = {
-    x: 0, y: 0, vx: 0, vy: 0, angle: 0,
-    speed: 320, accel: 22, drag: 0.90,
+    x: 0, y: 0, vx: 0, vy: 0, angle: 0, aimAngle: 0,
+    speed: 320, accel: 22, drag: 0.90, rotationSpeed: 8, // rotationSpeed added
     hp: 100, shield: 0, score: 0, credits: 0,
     fireCooldown: 0, shotRate: 0.13,
     shotSpeed: 680, shotDamage: 10, shotWidth: 2,
     inSafeZone: false
   };
 
-  // Entities
   const bullets = [];
   const asteroids = [];
   const particles = [];
 
-  // Waves
+  // --- Asteroids & Waves ---
   let waveLevel = 1;
   let paused = false;
-
-  function startWave(level) {
-    const count = 10 + (level - 1) * 4;
-    asteroids.length = 0;
-    for (let i = 0; i < count; i++) spawnAsteroid(level);
-    waveEl.textContent = level;
-    shopWave.textContent = level;
-  }
-
-  // Asteroids
-  function spawnAsteroid(level = waveLevel) {
-    const dist = 760 + rand(960);
-    const ang = rand(TAU);
-    const x = player.x + Math.cos(ang) * dist;
-    const y = player.y + Math.sin(ang) * dist;
-    const r = 22 + rand(24) + level * 0.6;
-    const hp = Math.round(24 + level * 6 + rand(16));
-    const speed = 110 + level * 5 + rand(30);
-    const dir = Math.atan2(player.y - y, player.x - x);
-    asteroids.push({
-      x, y, r, hp,
-      vx: Math.cos(dir) * speed,
-      vy: Math.sin(dir) * speed,
-      shape: makeRockShape(r)
-    });
-  }
+  let waveEnemiesRemaining = 0;
 
   function makeRockShape(r) {
     const sides = 7 + Math.floor(rand(3));
@@ -239,27 +220,138 @@
     return pts;
   }
 
-  // Shooting
+  function spawnAsteroid(level = waveLevel, type = 'medium', spawnX, spawnY) {
+    const isFragment = spawnX !== undefined;
+    
+    let r, hpBase, speedBase, credits;
+
+    if (type === 'large') {
+      r = 40 + rand(20) + level * 0.8;
+      hpBase = 40 + level * 8;
+      speedBase = 80 + level * 2;
+      credits = 15;
+    } else if (type === 'tiny') {
+      r = 10 + rand(5);
+      hpBase = 8 + level * 1;
+      speedBase = 200 + level * 10;
+      credits = 2;
+    } else { // medium (default/fragment)
+      r = 22 + rand(14) + level * 0.6;
+      hpBase = 24 + level * 6;
+      speedBase = 110 + level * 5;
+      credits = 5;
+    }
+
+    const dist = isFragment ? 0 : (760 + rand(960));
+    const ang = rand(TAU);
+    const x = spawnX !== undefined ? spawnX : (player.x + Math.cos(ang) * dist);
+    const y = spawnY !== undefined ? spawnY : (player.y + Math.sin(ang) * dist);
+    
+    const hp = Math.round(hpBase + rand(16));
+    const speed = speedBase + rand(30);
+    
+    // Aim towards player, or slightly off-center if fragment
+    let dir = Math.atan2(player.y - y, player.x - x);
+    if (isFragment) dir += (rand(0.5) - 0.25);
+
+    const a = new Entity(
+      x, y,
+      Math.cos(dir) * speed,
+      Math.sin(dir) * speed,
+    );
+    a.r = r; a.hp = hp; a.shape = makeRockShape(r); a.type = type; a.credits = credits;
+    asteroids.push(a);
+  }
+
+  function startWave(level) {
+    const baseCount = 10 + Math.floor(level * 1.5);
+    let largeCount = Math.floor(level / 3) + 1;
+    let mediumCount = baseCount - largeCount;
+
+    asteroids.length = 0;
+    waveEnemiesRemaining = mediumCount + largeCount;
+    
+    for (let i = 0; i < largeCount; i++) spawnAsteroid(level, 'large');
+    for (let i = 0; i < mediumCount; i++) spawnAsteroid(level, 'medium');
+
+    waveEl.textContent = level;
+    shopWave.textContent = level;
+    notify(`Wave ${level} started!`);
+  }
+
+  // --- Game Actions ---
   function fire() {
     if (player.fireCooldown > 0) return;
     player.fireCooldown = player.shotRate;
-    const baseAng = player.angle;
-    bullets.push({
-      x: player.x + Math.cos(baseAng)*18,
-      y: player.y + Math.sin(baseAng)*18,
-      vx: Math.cos(baseAng)*player.shotSpeed + player.vx*0.25,
-      vy: Math.sin(baseAng)*player.shotSpeed + player.vy*0.25,
-      life: 1.2,
-      w: player.shotWidth,
-      dmg: player.shotDamage
-    });
+    const fireAng = player.aimAngle;
+    
+    const b = new Entity(
+      player.x + Math.cos(fireAng)*18,
+      player.y + Math.sin(fireAng)*18,
+      Math.cos(fireAng)*player.shotSpeed + player.vx*0.25,
+      Math.sin(fireAng)*player.shotSpeed + player.vy*0.25,
+      1.2 // life
+    );
+    b.w = player.shotWidth; b.dmg = player.shotDamage;
+    bullets.push(b);
   }
 
-  // Notifications
-  let notifTimer = 0;
+  function explode(x, y, color = '#ffd29e', n = 14) {
+    for (let i = 0; i < n; i++) {
+      const ang = rand(TAU), sp = 120 + rand(160);
+      const p = new Entity(
+        x, y,
+        Math.cos(ang)*sp,
+        Math.sin(ang)*sp,
+        0.6 + rand(0.5) // life
+      );
+      p.color = color;
+      particles.push(p);
+    }
+  }
+
+  function spawnThrustParticle(ang) {
+    const sp = 40 + rand(100);
+    const p = new Entity(
+      player.x + Math.cos(ang + TAU/2) * 10,
+      player.y + Math.sin(ang + TAU/2) * 10,
+      -Math.cos(ang)*sp + player.vx*0.1,
+      -Math.sin(ang)*sp + player.vy*0.1,
+      0.1 + rand(0.1) // life
+    );
+    p.color = '#ffc87f';
+    particles.push(p);
+  }
+
   function notify(msg) { notifEl.textContent = msg; notifEl.style.display = 'block'; notifTimer = 2.2; }
 
-  // Shop
+  // --- UI & Shop ---
+  const hpEl = document.getElementById('hp');
+  const shieldEl = document.getElementById('shield');
+  const scoreEl = document.getElementById('score');
+  const waveEl = document.getElementById('wave');
+  const creditsEl = document.getElementById('credits');
+  const weaponEl = document.getElementById('weapon');
+  const speedEl = document.getElementById('speed');
+  const fpsEl = document.getElementById('fps');
+  const notifEl = document.getElementById('notif');
+  const planetOverlay = document.getElementById('planetOverlay');
+  const shopCredits = document.getElementById('shopCredits');
+  const shopWave = document.getElementById('shopWave');
+  const btnDamage = document.getElementById('buyDamage');
+  const btnRepair = document.getElementById('buyRepair');
+  const btnClose = document.getElementById('closeShop');
+  let notifTimer = 0;
+
+  function updateHUD() {
+    hpEl.textContent = Math.max(0, Math.round(player.hp));
+    shieldEl.textContent = Math.round(player.shield);
+    scoreEl.textContent = player.score;
+    creditsEl.textContent = player.credits;
+    speedEl.textContent = `Speed: ${(player.speed/320).toFixed(1)}x`;
+    weaponEl.textContent = 'Blaster';
+  }
+
   function pauseAtPlanet() {
     paused = true;
     planetOverlay.classList.add('active');
@@ -286,18 +378,14 @@
   btnDamage.addEventListener('click', () => { tryBuy(cost(12, 2), () => { player.shotDamage += (1 + Math.floor(waveLevel/12)); }); });
   btnRepair.addEventListener('click', () => { tryBuy(cost(8, 1), () => { player.hp = 100; }); });
 
-  // Steering smoothing (responsive)
-  function smoothAnalog(dt) {
-    const lerp = 1 - Math.exp(-28 * dt);
-    joyVX += (joyDX - joyVX) * lerp;
-    joyVY += (joyDY - joyVY) * lerp;
-  }
-
-  // Drawing helpers
+  // --- Drawing ---
   function drawAsteroid(a) {
     const s = toScreen(a.x, a.y);
-    if (s.x < -a.r-40 || s.x > W+a.r+40 || s.y < -a.r-40 || s.y > H+a.r+40) return;
-    ctx.fillStyle = '#3e455d';
+    if (s.x < -a.r-80 || s.x > W+a.r+80 || s.y < -a.r-80 || s.y > H+a.r+80) return;
+    
+    // Color based on size/type
+    let baseColor = a.type === 'large' ? '#5a617c' : a.type === 'tiny' ? '#2f3448' : '#3e455d';
+    ctx.fillStyle = baseColor;
     ctx.beginPath();
     const pts = a.shape;
     for (let i=0;i<pts.length;i++) {
@@ -308,27 +396,7 @@
     ctx.fill();
     ctx.strokeStyle = 'rgba(230,240,255,0.12)'; ctx.lineWidth = 2; ctx.stroke();
   }
-  function explode(x, y, color = '#ffd29e', n = 14) {
-    for (let i = 0; i < n; i++) {
-      const ang = rand(TAU), sp = 120 + rand(160);
-      particles.push({ x, y, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, life: 0.6 + rand(0.5), color });
-    }
-  }
 
-  // HUD
-  function updateHUD() {
-    hpEl.textContent = Math.max(0, Math.round(player.hp));
-    shieldEl.textContent = Math.round(player.shield);
-    scoreEl.textContent = player.score;
-    creditsEl.textContent = player.credits;
-    speedEl.textContent = `Speed: ${(player.speed/320).toFixed(1)}x`;
-    weaponEl.textContent = 'Blaster';
-  }
-
-  // Transform
-  function toScreen(x,y) { return { x: x - player.x + W/2, y: y - player.y + H/2 }; }
-
-  // Planets
   function drawPlanet(p) {
     const s = toScreen(p.x, p.y);
     if (s.x < -p.size-200 || s.x > W+p.size+200 || s.y < -p.size-200 || s.y > H+p.size+200) return;
@@ -354,7 +422,7 @@
     }
   }
 
-  // Main loop
+  // --- Main Loop ---
   let last = performance.now(), fpsAcc = 0, fpsFrames = 0, fps = 0;
 
   function loop(now) {
@@ -362,6 +430,7 @@
     const dt = Math.min(0.033, (now - last) / 1000);
     last = now;
 
+    // FPS Counter
     fpsAcc += dt; fpsFrames++;
     if (fpsAcc >= 0.5) { fps = Math.round(fpsFrames / fpsAcc); fpsAcc = 0; fpsFrames = 0; fpsEl.textContent = `FPS: ${fps}`; }
 
@@ -373,22 +442,55 @@
     const right = keys.has('arrowright') || keys.has('d') || joyVX > 0.12;
     const shooting = keys.has(' ') || fireHeld;
 
+    // --- Player Update ---
     if (!paused) {
-      const ax = (right - left) * player.accel + joyVX * player.accel * 1.4;
-      const ay = (down - up) * player.accel + joyVY * player.accel * 1.4;
-      player.vx += ax; player.vy += ay;
-      const maxV = player.speed;
+      // 1. Movement and Velocity
+      const accX = (right - left) * player.accel + joyVX * player.accel * 1.4;
+      const accY = (down - up) * player.accel + joyVY * player.accel * 1.4;
+      player.vx += accX * dt; player.vy += accY * dt; // Apply acceleration over dt
       const vLen = Math.hypot(player.vx, player.vy);
-      if (vLen > maxV) { const k = maxV / vLen; player.vx *= k; player.vy *= k; }
-      player.vx *= player.drag; player.vy *= player.drag;
-      player.x += player.vx * dt * 60 * 0.016;
-      player.y += player.vy * dt * 60 * 0.016;
-      if (vLen > 1) player.angle = Math.atan2(player.vy, player.vx);
+      if (vLen > player.speed) { const k = player.speed / vLen; player.vx *= k; player.vy *= k; }
+      
+      // Drag/Damping
+      player.vx *= Math.pow(player.drag, dt * 60); 
+      player.vy *= Math.pow(player.drag, dt * 60);
+
+      // Position Update (using corrected dt)
+      player.x += player.vx * dt;
+      player.y += player.vy * dt;
+
+      // 2. Aiming Angle (for shooting/rotation target)
+      let targetAngle = player.aimAngle;
+      const moving = Math.hypot(accX, accY) > 0.5 || joyActive;
+
+      if (moving) {
+        // Calculate new target angle based on movement or joystick
+        const aimX = (right - left) * 1 + joyVX * 1;
+        const aimY = (down - up) * 1 + joyVY * 1;
+        if (Math.hypot(aimX, aimY) > 0.1) {
+            targetAngle = Math.atan2(aimY, aimX);
+        }
+      } else if (vLen > 5) {
+        // Coasting: Aim where you are moving (angle of velocity)
+        targetAngle = Math.atan2(player.vy, player.vx);
+      }
+      
+      player.aimAngle = targetAngle;
+
+      // 3. Ship Angle (for visuals/rotation, interpolated)
+      const rotLerp = 1 - Math.exp(-player.rotationSpeed * dt);
+      player.angle = lerpAngle(player.angle, targetAngle, rotLerp);
+      
+      // 4. Thrust Particles
+      if (moving && Math.hypot(accX, accY) > 0.1) {
+        spawnThrustParticle(targetAngle);
+      }
+
       player.fireCooldown = Math.max(0, player.fireCooldown - dt);
       if (shooting) fire();
     }
 
-    // Background
+    // --- Rendering: Background ---
     ctx.fillStyle = '#060a16';
     ctx.fillRect(0,0,W,H);
     parallax.forEach(layer => {
@@ -407,33 +509,34 @@
     player.inSafeZone = false;
     for (const p of planets) drawPlanet(p);
 
-    // Bullets
+    // --- Entity Updates (Non-Paused) ---
     if (!paused) {
+      // Bullets
       for (let i = bullets.length-1; i >= 0; i--) {
         const b = bullets[i];
-        b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
-        if (b.life <= 0) bullets.splice(i,1);
+        b.update(dt);
+        if (!b.isAlive()) bullets.splice(i,1);
       }
-    }
 
-    // Asteroids updates
-    if (!paused) {
+      // Asteroids
       for (let i = asteroids.length-1; i >= 0; i--) {
         const a = asteroids[i];
-        a.x += a.vx * dt; a.y += a.vy * dt;
+        a.update(dt);
 
-        // Off-screen: respawn around player and re-aim
+        // Off-screen respawn and re-aim
         const scr = toScreen(a.x, a.y);
-        const margin = 80;
+        const margin = a.r + 100;
         if (scr.x < -margin || scr.x > W + margin || scr.y < -margin || scr.y > H + margin) {
-          const dist = 700 + rand(500);
-          const ang = rand(TAU);
-          a.x = player.x + Math.cos(ang) * dist;
-          a.y = player.y + Math.sin(ang) * dist;
-          const dir = Math.atan2(player.y - a.y, player.x - a.x);
-          const speed = Math.hypot(a.vx, a.vy) || (110 + waveLevel * 5);
-          a.vx = Math.cos(dir) * speed;
-          a.vy = Math.sin(dir) * speed;
+          if (a.type !== 'fragment') { // Only respawn original spawns
+            const dist = 700 + rand(500);
+            const ang = rand(TAU);
+            a.x = player.x + Math.cos(ang) * dist;
+            a.y = player.y + Math.sin(ang) * dist;
+            const dir = Math.atan2(player.y - a.y, player.x - a.x);
+            const speed = Math.hypot(a.vx, a.vy);
+            a.vx = Math.cos(dir) * speed;
+            a.vy = Math.sin(dir) * speed;
+          }
           continue;
         }
 
@@ -445,26 +548,34 @@
             bullets.splice(j,1);
             if (a.hp <= 0) {
               player.score += Math.round(10 + a.r);
-              player.credits += 5;
+              player.credits += a.credits;
+              
+              if (a.type === 'large') {
+                for(let k=0; k<3; k++) spawnAsteroid(waveLevel, 'medium', a.x, a.y);
+              } else if (a.type === 'medium') {
+                if (rand() < 0.2) spawnAsteroid(waveLevel, 'tiny', a.x, a.y); // Spawn a tiny fragment occasionally
+              }
+              
+              waveEnemiesRemaining--; // Only decrement for original wave enemies
               explode(a.x, a.y);
               asteroids.splice(i,1);
+              i--; 
               break;
             }
           }
         }
 
         // Player collision
-        if ((a.x-player.x)**2 + (a.y-player.y)**2 <= (a.r+14)**2) {
+        if (i >= 0 && (a.x-player.x)**2 + (a.y-player.y)**2 <= (a.r+14)**2) {
           const dmg = 5 + Math.floor(waveLevel * 0.6);
-          if (player.shield > 0) {
-            const absorb = Math.min(player.shield, dmg);
-            player.shield -= absorb;
-            player.hp -= (dmg - absorb);
-          } else {
-            player.hp -= dmg;
-          }
+          const absorb = Math.min(player.shield, dmg);
+          player.shield -= absorb;
+          player.hp -= (dmg - absorb);
+          
+          if (a.type !== 'tiny') waveEnemiesRemaining--; 
           explode(a.x, a.y);
           asteroids.splice(i,1);
+          i--; 
           if (player.hp <= 0) {
             player.credits = Math.floor(player.credits * 0.5);
             notify('Ship destroyed. Lost 50% credits. Respawning wave ' + waveLevel);
@@ -474,28 +585,33 @@
         }
       }
 
-      // Maintain wave pressure
-      const desired = 10 + (waveLevel - 1) * 4;
-      if (asteroids.length < Math.floor(desired * 0.4)) {
-        const add = Math.min(6, desired - asteroids.length);
-        for (let i = 0; i < add; i++) spawnAsteroid();
+      // Wave Progression Check
+      if (waveEnemiesRemaining <= 0 && asteroids.length === 0) {
+        notify(`WAVE ${waveLevel} CLEARED! +${waveLevel * 20} Bonus Credits!`);
+        player.credits += waveLevel * 20;
+        waveLevel++;
+        setTimeout(() => startWave(waveLevel), 3000); 
       }
     }
 
-    // Render asteroids
+    // Particles Update (Always update, even when paused)
+    for (let i = particles.length-1; i >= 0; i--) {
+        const p = particles[i];
+        if (!paused) p.update(dt);
+        if (!p.isAlive()) particles.splice(i,1);
+    }
+    
+    // --- Rendering: Entities ---
     for (const a of asteroids) drawAsteroid(a);
 
     // Particles
-    for (let i = particles.length-1; i >= 0; i--) {
-      const p = particles[i];
-      p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+    for (const p of particles) {
       const sp = toScreen(p.x, p.y);
       ctx.globalAlpha = Math.max(0, p.life);
       ctx.fillStyle = p.color;
-      ctx.fillRect(sp.x, sp.y, 2, 2);
-      ctx.globalAlpha = 1;
-      if (p.life <= 0) particles.splice(i,1);
+      ctx.fillRect(sp.x, sp.y, p.color === '#ffc87f' ? 3 : 2, p.color === '#ffc87f' ? 3 : 2);
     }
+    ctx.globalAlpha = 1;
 
     // Bullets
     ctx.strokeStyle = '#b7c5ff';
@@ -503,8 +619,10 @@
       const s = toScreen(b.x, b.y);
       ctx.lineWidth = b.w;
       ctx.beginPath();
+      const trailAng = Math.atan2(b.vy, b.vx); 
+      const trailLen = 8;
       ctx.moveTo(s.x, s.y);
-      ctx.lineTo(s.x - Math.cos(player.angle)*8, s.y - Math.sin(player.angle)*8);
+      ctx.lineTo(s.x - Math.cos(trailAng)*trailLen, s.y - Math.sin(trailAng)*trailLen);
       ctx.stroke();
     }
 
@@ -521,6 +639,7 @@
     ctx.lineTo(-12, 10);
     ctx.closePath();
     ctx.fill();
+    // Shield
     if (player.shield > 0) {
       const alpha = clamp(player.shield / 120, 0.2, 0.7);
       ctx.strokeStyle = `rgba(92,255,177,${alpha})`;
@@ -531,6 +650,7 @@
     }
     ctx.restore();
 
+    // HUD & Notifications
     updateHUD();
     if (notifTimer > 0) { notifTimer -= dt; if (notifTimer <= 0) notifEl.style.display = 'none'; }
   }
@@ -540,11 +660,11 @@
     player.x = 0; player.y = 0; player.vx = 0; player.vy = 0;
     bullets.length = 0; particles.length = 0;
     paused = false; planetOverlay.classList.remove('active');
-    startWave(waveLevel);
+    startWave(waveLevel); 
     updateHUD();
   }
 
-  // Start correctly: init stars, generate planets, start wave, then start loop
+  // Initial Start
   startWave(waveLevel);
   requestAnimationFrame(loop);
 
