@@ -221,6 +221,7 @@
   }
 
   function spawnAsteroid(level = waveLevel, type = 'medium', spawnX, spawnY) {
+    // If spawnX/spawnY are provided, it's a fragment from a destroyed asteroid.
     const isFragment = spawnX !== undefined;
     
     let r, hpBase, speedBase, credits;
@@ -260,7 +261,7 @@
       Math.sin(dir) * speed,
     );
     a.r = r; a.hp = hp; a.shape = makeRockShape(r); a.type = type; a.credits = credits;
-    // FIX 1: Add respawnable flag. Only original wave enemies (large and non-fragment medium) should respawn.
+    // CRITICAL FIX: Only original wave enemies (spawns from the edge) should respawn. Fragments and tiny rocks should be destroyed when they leave the screen.
     a.respawnable = !isFragment && type !== 'tiny';
     asteroids.push(a);
   }
@@ -525,11 +526,11 @@
         const a = asteroids[i];
         a.update(dt);
 
-        // Off-screen respawn and re-aim
+        // Off-screen respawn and removal
         const scr = toScreen(a.x, a.y);
         const margin = a.r + 100;
         if (scr.x < -margin || scr.x > W + margin || scr.y < -margin || scr.y > H + margin) {
-          // FIX 2: Check the respawnable flag.
+          
           if (a.respawnable) { 
             // Respawn original wave spawns (large and non-fragment medium)
             const dist = 700 + rand(500);
@@ -543,9 +544,9 @@
           } else {
             // Remove fragments (medium and tiny created by breaking large ones)
             asteroids.splice(i,1);
-            i--;
+            i--; // CRITICAL: Decrement index after removal
           }
-          continue;
+          continue; // Go to next asteroid in loop
         }
 
         // Bullet hits
@@ -564,7 +565,9 @@
                 if (rand() < 0.2) spawnAsteroid(waveLevel, 'tiny', a.x, a.y); // Spawn a tiny fragment occasionally
               }
               
-              waveEnemiesRemaining--; // Only decrement for original wave enemies
+              // Only decrement the wave count for *original* asteroids, not fragments
+              if (a.respawnable) waveEnemiesRemaining--; 
+              
               explode(a.x, a.y);
               asteroids.splice(i,1);
               i--; 
@@ -580,7 +583,9 @@
           player.shield -= absorb;
           player.hp -= (dmg - absorb);
           
-          if (a.type !== 'tiny') waveEnemiesRemaining--; 
+          // Decrement if it was an original wave enemy
+          if (a.respawnable) waveEnemiesRemaining--; 
+          
           explode(a.x, a.y);
           asteroids.splice(i,1);
           i--; 
