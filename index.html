@@ -3,17 +3,18 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Star Drift (Enhanced)</title>
+<title>Star Drift (Final)</title>
 <style>
   :root { color-scheme: dark; --bg:#0a0f1e; --fg:#b5c7ff; --hud:rgba(255,255,255,0.08); }
   
-    /* FIX: Ensure the body background is the dark theme color and covers 100% */
+    /* FINAL FIX: Ensure 100% viewport height and dark background is applied to HTML/BODY */
+  html { height: 100vh; }
   html, body { 
         margin:0; 
         padding:0; 
-        background:var(--bg); /* Applied directly */
+        background:var(--bg);
         height:100%; 
-        width: 100%; /* Ensure full width */
+        width: 100%; 
         overflow:hidden; 
         font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; 
     }
@@ -60,6 +61,7 @@
       <span class="badge" id="weapon">Blaster</span>
       <span class="badge" id="speed">Speed: 1.0x</span>
       <span class="badge" id="fps">FPS</span>
+      <span class="badge" id="joyDebug">JOY: 0.0</span>
     </div>
   </div>
 
@@ -204,7 +206,7 @@
 
   const player = {
     x: 0, y: 0, vx: 0, vy: 0, angle: 0, aimAngle: 0,
-    speed: 320, accel: 22, drag: 0.90, rotationSpeed: 8, // rotationSpeed added
+    speed: 320, accel: 22, drag: 0.90, rotationSpeed: 8,
     hp: 100, shield: 0, score: 0, credits: 0,
     fireCooldown: 0, shotRate: 0.13,
     shotSpeed: 680, shotDamage: 10, shotWidth: 2,
@@ -232,7 +234,6 @@
   }
 
   function spawnAsteroid(level = waveLevel, type = 'medium', spawnX, spawnY) {
-    // If spawnX/spawnY are provided, it's a fragment from a destroyed asteroid.
     const isFragment = spawnX !== undefined;
     
     let r, hpBase, speedBase, credits;
@@ -262,7 +263,6 @@
     const hp = Math.round(hpBase + rand(16));
     const speed = speedBase + rand(30);
     
-    // Aim towards player, or slightly off-center if fragment
     let dir = Math.atan2(player.y - y, player.x - x);
     if (isFragment) dir += (rand(0.5) - 0.25);
 
@@ -272,7 +272,6 @@
       Math.sin(dir) * speed,
     );
     a.r = r; a.hp = hp; a.shape = makeRockShape(r); a.type = type; a.credits = credits;
-    // Only original wave enemies (spawns from the edge) should respawn. Fragments and tiny rocks should be destroyed when they leave the screen.
     a.respawnable = !isFragment && type !== 'tiny';
     asteroids.push(a);
   }
@@ -349,6 +348,7 @@
   const speedEl = document.getElementById('speed');
   const fpsEl = document.getElementById('fps');
   const notifEl = document.getElementById('notif');
+  const joyDebugEl = document.getElementById('joyDebug');
   const planetOverlay = document.getElementById('planetOverlay');
   const shopCredits = document.getElementById('shopCredits');
   const shopWave = document.getElementById('shopWave');
@@ -364,6 +364,7 @@
     creditsEl.textContent = player.credits;
     speedEl.textContent = `Speed: ${(player.speed/320).toFixed(1)}x`;
     weaponEl.textContent = 'Blaster';
+    if (joyDebugEl) joyDebugEl.textContent = `JOY: ${joyActive ? Math.hypot(joyDX, joyDY).toFixed(1) : '0.0'}`;
   }
 
   function pauseAtPlanet() {
@@ -448,7 +449,7 @@
     fpsAcc += dt; fpsFrames++;
     if (fpsAcc >= 0.5) { fps = Math.round(fpsFrames / fpsAcc); fpsAcc = 0; fpsFrames = 0; fpsEl.textContent = `FPS: ${fps}`; }
 
-    // CRITICAL FIX: Always smooth analog input, even when paused, so the values are ready when unpaused/moving.
+    // Always smooth analog input (even when paused)
     smoothAnalog(dt);
 
     const up = keys.has('arrowup') || keys.has('w');
@@ -457,10 +458,9 @@
     const right = keys.has('arrowright') || keys.has('d');
     const shooting = keys.has(' ') || fireHeld;
 
-    // Get the current analog inputs, prioritizing the smooth version if the joystick is active.
-    // Use Math.max to combine keyboard/mobile input for acceleration and aiming.
-    const currentJoyX = joyActive ? joyVX : 0;
-    const currentJoyY = joyActive ? joyVY : 0;
+    // FIX: Use raw joyDX/DY for immediate input when active, blended with keyboard.
+    const currentJoyX = joyActive ? joyDX : 0;
+    const currentJoyY = joyActive ? joyDY : 0;
     
     // --- Player Update ---
     if (!paused) {
