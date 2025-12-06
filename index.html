@@ -6,7 +6,18 @@
 <title>Star Drift (Enhanced)</title>
 <style>
   :root { color-scheme: dark; --bg:#0a0f1e; --fg:#b5c7ff; --hud:rgba(255,255,255,0.08); }
-  html, body { margin:0; padding:0; background:var(--bg); height:100%; overflow:hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  
+    /* FIX: Ensure the body background is the dark theme color and covers 100% */
+  html, body { 
+        margin:0; 
+        padding:0; 
+        background:var(--bg); /* Applied directly */
+        height:100%; 
+        width: 100%; /* Ensure full width */
+        overflow:hidden; 
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; 
+    }
+    
   #game { display:block; width:100vw; height:100vh; touch-action:none; }
 
   .hud { position:fixed; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center;
@@ -261,7 +272,7 @@
       Math.sin(dir) * speed,
     );
     a.r = r; a.hp = hp; a.shape = makeRockShape(r); a.type = type; a.credits = credits;
-    // CRITICAL FIX: Only original wave enemies (spawns from the edge) should respawn. Fragments and tiny rocks should be destroyed when they leave the screen.
+    // Only original wave enemies (spawns from the edge) should respawn. Fragments and tiny rocks should be destroyed when they leave the screen.
     a.respawnable = !isFragment && type !== 'tiny';
     asteroids.push(a);
   }
@@ -437,19 +448,26 @@
     fpsAcc += dt; fpsFrames++;
     if (fpsAcc >= 0.5) { fps = Math.round(fpsFrames / fpsAcc); fpsAcc = 0; fpsFrames = 0; fpsEl.textContent = `FPS: ${fps}`; }
 
+    // CRITICAL FIX: Always smooth analog input, even when paused, so the values are ready when unpaused/moving.
     smoothAnalog(dt);
 
-    const up = keys.has('arrowup') || keys.has('w') || joyVY < -0.12;
-    const down = keys.has('arrowdown') || keys.has('s') || joyVY > 0.12;
-    const left = keys.has('arrowleft') || keys.has('a') || joyVX < -0.12;
-    const right = keys.has('arrowright') || keys.has('d') || joyVX > 0.12;
+    const up = keys.has('arrowup') || keys.has('w');
+    const down = keys.has('arrowdown') || keys.has('s');
+    const left = keys.has('arrowleft') || keys.has('a');
+    const right = keys.has('arrowright') || keys.has('d');
     const shooting = keys.has(' ') || fireHeld;
 
+    // Get the current analog inputs, prioritizing the smooth version if the joystick is active.
+    // Use Math.max to combine keyboard/mobile input for acceleration and aiming.
+    const currentJoyX = joyActive ? joyVX : 0;
+    const currentJoyY = joyActive ? joyVY : 0;
+    
     // --- Player Update ---
     if (!paused) {
       // 1. Movement and Velocity
-      const accX = (right - left) * player.accel + joyVX * player.accel * 1.4;
-      const accY = (down - up) * player.accel + joyVY * player.accel * 1.4;
+      const accX = (right - left) * player.accel + currentJoyX * player.accel * 1.4;
+      const accY = (down - up) * player.accel + currentJoyY * player.accel * 1.4;
+    
       player.vx += accX * dt; player.vy += accY * dt; // Apply acceleration over dt
       const vLen = Math.hypot(player.vx, player.vy);
       if (vLen > player.speed) { const k = player.speed / vLen; player.vx *= k; player.vy *= k; }
@@ -468,8 +486,8 @@
 
       if (moving) {
         // Calculate new target angle based on movement or joystick
-        const aimX = (right - left) * 1 + joyVX * 1;
-        const aimY = (down - up) * 1 + joyVY * 1;
+        const aimX = (right - left) * 1 + currentJoyX * 1;
+        const aimY = (down - up) * 1 + currentJoyY * 1;
         if (Math.hypot(aimX, aimY) > 0.1) {
             targetAngle = Math.atan2(aimY, aimX);
         }
@@ -544,7 +562,7 @@
           } else {
             // Remove fragments (medium and tiny created by breaking large ones)
             asteroids.splice(i,1);
-            i--; // CRITICAL: Decrement index after removal
+            i--; // Decrement index after removal
           }
           continue; // Go to next asteroid in loop
         }
