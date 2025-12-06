@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Star Drift (Final)</title>
+<title>Star Drift (Minimal Input)</title>
 <style>
-  :root { color-scheme: dark; --bg:#0a0f1e; --fg:#b5c7ff; --hud:rgba(255,255,255,0.08); }
+  :root { color-scheme: dark; --bg:#0a0f1e; --fg:#b5c7ff; }
   
-    /* FINAL FIX: Ensure 100% viewport height and dark background is applied to HTML/BODY */
+    /* Aggressive background/size setup to fix the white bar */
   html { height: 100vh; }
   html, body { 
         margin:0; 
@@ -19,22 +19,23 @@
         font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; 
     }
     
-  #game { display:block; width:100vw; height:100vh; touch-action:none; }
+  #game { 
+        display:block; 
+        width:100vw; 
+        height:100vh; 
+        /* Crucial for touch input on the canvas */
+        touch-action:none; 
+    }
 
   .hud { position:fixed; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center;
     padding:8px 10px; color:var(--fg); font-size:14px; background:linear-gradient(to bottom, rgba(0,0,0,0.35), transparent); z-index:10; }
-  .hud .pill { background:var(--hud); border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:6px 10px; display:inline-flex; gap:10px; align-items:center; }
+  .hud .pill { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:6px 10px; display:inline-flex; gap:10px; align-items:center; }
   .hud .right { display:flex; align-items:center; gap:8px; }
   .badge { display:inline-block; padding:2px 6px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); font-size:12px; }
 
   .notif { position:fixed; left:50%; transform:translateX(-50%); bottom:16px; color:#fff; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:8px 12px; font-size:14px; pointer-events:none; z-index:12; display:none; }
 
-  .controls { position:fixed; bottom:16px; left:16px; right:16px; display:flex; justify-content:space-between; align-items:center; z-index:11; pointer-events:auto; }
-  .stick { width:160px; height:160px; border-radius:50%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.15); position:relative; touch-action:none; }
-  .nub { width:64px; height:64px; border-radius:50%; background:rgba(255,255,255,0.16); border:2px solid rgba(255,255,255,0.35); position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); }
-  .btn { width:96px; height:96px; border-radius:50%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.2); }
-  .btn:active { background:rgba(255,255,255,0.11); }
-  @media (min-width: 900px) { .controls { display:none; } }
+    /* The original controls div is now removed */
 
   .overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; color:var(--fg); z-index:13; backdrop-filter: blur(3px) brightness(0.9); }
   .overlay.active { display:flex; }
@@ -65,11 +66,6 @@
     </div>
   </div>
 
-  <div class="controls">
-    <div class="stick" id="stick"><div class="nub" id="nub"></div></div>
-    <div class="btn" id="fireBtn" aria-label="Shoot"></div>
-  </div>
-
   <div class="overlay" id="planetOverlay">
     <div class="card">
       <h2>Planet dock</h2>
@@ -94,6 +90,7 @@
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d', { alpha: false });
   let W = 0, H = 0, DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  
   function resize() {
     W = Math.floor(window.innerWidth);
     H = Math.floor(window.innerHeight);
@@ -102,6 +99,8 @@
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    joyCenter.x = W * 0.15; joyCenter.y = H - 120;
+    fireCenter.x = W * 0.85; fireCenter.y = H - 100;
   }
   addEventListener('resize', resize); resize();
 
@@ -110,7 +109,6 @@
   const rand = (n=1) => Math.random() * n;
   function toScreen(x,y) { return { x: x - player.x + W/2, y: y - player.y + H/2 }; }
 
-  // Angular interpolation helper
   function lerpAngle(a1, a2, t) {
     let diff = a2 - a1;
     if (diff > Math.PI) diff -= TAU;
@@ -144,34 +142,71 @@
   });
   addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
-  // Mobile controls
-  const stick = document.getElementById('stick');
-  const nub = document.getElementById('nub');
-  const fireBtn = document.getElementById('fireBtn');
+  // Simplified Canvas-based Mobile controls
   let joyActive = false, joyDX = 0, joyDY = 0, fireHeld = false;
-  let joyVX = 0, joyVY = 0;
-  function setNub(x, y) { nub.style.left = (x * 50 + 50) + '%'; nub.style.top = (y * 50 + 50) + '%'; }
-  function joyReset() { joyDX = 0; joyDY = 0; setNub(0,0); }
-  stick.addEventListener('pointerdown', (e) => { joyActive = true; stick.setPointerCapture(e.pointerId); });
-  stick.addEventListener('pointermove', (e) => {
-    if (!joyActive) return;
-    const r = stick.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2;
-    const dx = e.clientX - cx, dy = e.clientY - cy;
-    const max = r.width * 0.45, len = Math.hypot(dx, dy);
-    const nx = len > max ? dx * (max / len) : dx;
-    const ny = len > max ? dy * (max / len) : dy;
-    joyDX = nx / max; joyDY = ny / max;
-    setNub(joyDX, joyDY);
-  });
-  stick.addEventListener('pointerup', () => { joyActive = false; joyReset(); });
-  fireBtn.addEventListener('pointerdown', () => { fireHeld = true; });
-  fireBtn.addEventListener('pointerup', () => { fireHeld = false; });
+  let joyCenter = { x: 0, y: 0 }, fireCenter = { x: 0, y: 0 };
+  const joyRadius = 80;
+  const fireRadius = 50;
+  let joyTouchId = null;
 
-  function smoothAnalog(dt) {
-    const lerp = 1 - Math.exp(-28 * dt);
-    joyVX += (joyDX - joyVX) * lerp;
-    joyVY += (joyDY - joyVY) * lerp;
-  }
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    for (let touch of e.changedTouches) {
+      const x = touch.clientX, y = touch.clientY;
+      
+      // Check fire button (right side)
+      if (Math.hypot(x - fireCenter.x, y - fireCenter.y) < fireRadius * 1.5) {
+        fireHeld = true;
+      } 
+      
+      // Check joystick area (left side)
+      else if (y > H / 2 && x < W / 2) { // Only bottom-left quadrant
+        if (!joyActive) { // Claim the first touch in the joy area
+          joyActive = true;
+          joyTouchId = touch.identifier;
+        }
+      }
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (!joyActive) return;
+
+    for (let touch of e.changedTouches) {
+      if (touch.identifier === joyTouchId) {
+        const dx = touch.clientX - joyCenter.x;
+        const dy = touch.clientY - joyCenter.y;
+        const len = Math.hypot(dx, dy);
+        const max = joyRadius;
+        
+        joyDX = clamp(dx / max, -1, 1);
+        joyDY = clamp(dy / max, -1, 1);
+        
+        // If joystick moves out of bounds, lock it
+        if (len > max) {
+          joyDX = dx * (max / len) / max;
+          joyDY = dy * (max / len) / max;
+        }
+        break;
+      }
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    for (let touch of e.changedTouches) {
+      // If the joystick touch lifts
+      if (touch.identifier === joyTouchId) {
+        joyActive = false;
+        joyTouchId = null;
+        joyDX = 0; joyDY = 0;
+      }
+      // If any touch lifts, stop firing
+      fireHeld = false;
+    }
+  }, { passive: false });
+
 
   // --- Game Objects ---
   const parallax = [
@@ -436,6 +471,41 @@
       else { if (paused) unpauseFromPlanet(); }
     }
   }
+    
+    function drawControls() {
+        if (!paused && W < 900) { // Only draw controls on smaller screens
+            // Draw Joystick Base
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.fillStyle = 'rgba(255,255,255,0.04)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(joyCenter.x, joyCenter.y, joyRadius, 0, TAU);
+            ctx.fill();
+            ctx.stroke();
+
+            // Draw Joystick Nub
+            let nubX = joyCenter.x + joyDX * joyRadius;
+            let nubY = joyCenter.y + joyDY * joyRadius;
+            
+            ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+            ctx.fillStyle = 'rgba(255,255,255,0.16)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(nubX, nubY, 32, 0, TAU);
+            ctx.fill();
+            ctx.stroke();
+
+            // Draw Fire Button
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.fillStyle = fireHeld ? 'rgba(255,255,255,0.11)' : 'rgba(255,255,255,0.06)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(fireCenter.x, fireCenter.y, fireRadius, 0, TAU);
+            ctx.fill();
+            ctx.stroke();
+        }
+    }
+
 
   // --- Main Loop ---
   let last = performance.now(), fpsAcc = 0, fpsFrames = 0, fps = 0;
@@ -449,18 +519,15 @@
     fpsAcc += dt; fpsFrames++;
     if (fpsAcc >= 0.5) { fps = Math.round(fpsFrames / fpsAcc); fpsAcc = 0; fpsFrames = 0; fpsEl.textContent = `FPS: ${fps}`; }
 
-    // Always smooth analog input (even when paused)
-    smoothAnalog(dt);
-
     const up = keys.has('arrowup') || keys.has('w');
     const down = keys.has('arrowdown') || keys.has('s');
     const left = keys.has('arrowleft') || keys.has('a');
     const right = keys.has('arrowright') || keys.has('d');
     const shooting = keys.has(' ') || fireHeld;
 
-    // FIX: Use raw joyDX/DY for immediate input when active, blended with keyboard.
-    const currentJoyX = joyActive ? joyDX : 0;
-    const currentJoyY = joyActive ? joyDY : 0;
+    // Use raw joyDX/DY for movement
+    const currentJoyX = joyDX;
+    const currentJoyY = joyDY;
     
     // --- Player Update ---
     if (!paused) {
@@ -681,6 +748,9 @@
     }
     ctx.restore();
 
+    // Draw Controls (new function)
+    drawControls();
+
     // HUD & Notifications
     updateHUD();
     if (notifTimer > 0) { notifTimer -= dt; if (notifTimer <= 0) notifEl.style.display = 'none'; }
@@ -700,7 +770,7 @@
   requestAnimationFrame(loop);
 
   addEventListener('load', () => {
-    notify('Drag the joystick to steer. Tap the right circle to shoot. Dock at planets to shop.');
+    notify('Using minimal controls. Drag bottom-left to steer. Tap bottom-right to shoot.');
     setTimeout(() => { notifEl.style.display = 'none'; }, 3000);
   });
 })();
